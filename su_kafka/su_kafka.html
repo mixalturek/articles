@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>su kafka</title>
+
+    <style media="all">
+        body { background-color: silver; font-family: sans-serif; text-align: justify; line-height: 1.4em; }
+        #page { margin: auto; width: 90em; background-color: white; padding: 2em; border: 1px solid black; }
+        .img { text-align: center; }
+    </style>
+</head>
+
+<body>
+<div id="page">
+
+<h1>su kafka</h1>
+
+<p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a restartu jednoho z nodů Apache Kafka clusteru ve frankfurtském datacentru hlásit duplikace v konzumovaných zprávách.</p>
+
+<p>V naší konfiguraci taková situace kvůli timeoutům a následným pokusům o opětovné odeslání může občas (zřídka) nastat a v dostatečně malém množství nám nevadí, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+
+<p>Začátek problémů celkem jasně korespondoval s aktualizací a restartem jednoho Kafka brokeru. Zkušenosti říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad budeme mít také.</p>
+
+
+<h2>Systém z výšky jednoho kilometru</h2>
+
+<p>Náš systém pro analýzu dat má především kvůli možnosti škálovat do datacenter dvě vrstvy oddělených Kafka clusterů. Přijímací Kafka běží ve čtyřech datacentrech rozložených různě po světě. Zapisuje do nich Receiver, což je v podstatě REST-like proxy pro Kafka producer, který mimo jiné do událostí vyplňuje IP adresy protistrany a čas příjmu dat. Kafka slouží jako distribuovaný perzistentní log. Ve chvíli, kdy je do ní libovolná zpráva uložena, máme několik dnů na její vykonzumování a zpracování. Receiver a DC Kafka jsou tedy základem stability systému a musí vždy spolehlivě běžet.</p>
+
+<p>Události z Kafky vyčítají Input Filtry, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v klientech, doplnění GeoIP informací a podobně. Data se zapisují zpět do stejné DC Kafky, ale do jinak pojmenovaných topiků.</p>
+
+<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud události vyčítají finální konzumeři do Hadoopu/HDFS, do Elastic Searche, popř. se jedná o stream processing.</p>
+
+<p class="img"><img src="img/kafka_pipeline.png" /></p>
+
+<h2>Duplicity, duplicity, duplicity</h2>
+
+<p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách Kafka pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní UUID.randomUUID() pro zpárování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví dvakrát, je to jasná známka duplikace, ať už vznikla kdekoli.</p>
+
+<p>Jelikož počátek duplikací časově korespondoval s restartem Kafka brokeru ve franskfurtském datacentru, dalo se předpokládat, že je na vině některý ze systémů, který přímo komunikuje s Kafkou, tj. Receiver (producer), Filtry (konsumer, producer), ostatní Kafka brokeři ve frankfurtu (repliky) nebo Mirror maker (konzumer).</p>
+
+<p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurkt bylo vše ihned jasné. Stačil jednoduchý restart procesu a trafik se opět skokově snížil na původní hodnutu a integrační testy se znovu samým štěstím zazelenaly.</p>
+
+<p class="img"><img src="img/duplicates_mirrors_all.png" /></p>
+<p class="img"><img src="img/duplicates_mirrors_fra.png" /></p>
+
+<p>Poznámka na okraj pro úplnost článku: Chybu v Mirror makeru a potažmo v libovolném Kafka konzumeru jsme nedokázali vystopovat. Na základě logů jsme měli několik teorií, ale všechny jsme bohužel dokázali celkem snadno vyvrátit. Bug report do Kafky nemělo cenu vytvářet, protože jsme neměli žádné vodítko, kterým směrem obrátit pozornost Kafka vývojářů. Ti jsou mimochodem velice aktivní a odpovídají prakticky okamžitě, už jsme pár chyb v minulosti hlásili.</p>
+
+
+<h2>Zabíjíme Kafku</h2>
+
+<p>Proč jsou restarty Kafky vždycky tak křehké jako napůl vysušený hrad z písku? A proč to nikdo jiný než my neřeší? Tohle přece musí vadit každému. Žádný ticket, žádný článek, žádný blog.</p>
+
+<p>Chvíle ticha.</p>
+
+<p>A co když je problém jenom u nás na serverech? Když spouštím Kafku u sebe při vývoji, je typicky všechno v pořádku. Ale u mě neteče třicet tisíc zpráv za vteřinu, může být rozdíl v tom? Pojďme to už jednou pro vždy vyřešit!</p>
+
+<p>Pozorované symptomy</p>
+
+<ul>
+<li>Kafka po restartu vždy přepočítává spousty koruptovaných souborů s indexy. Tato operace běžně trvá i <strong>několik hodin</strong> a opravdu bolí. Jeden rolling restart celého clusteru trvá běžně celý den. Update na novou verzi potřebuje v obecném případě dva restarty a clusterů máme několik. Zkrátka obrovské au.</li>
+<li>Pokud se Kafka po zastavení hned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID  je stále registrované a je třeba chvíli počkat na timeout.</li>
+<li>Producerům se v okamžiku restartu nedaří zapisovat do partition, jejichž leader je při rebalancingu migrován na ostatní brokery z ISR (In Sync Replicas). Callback v klientu obdrží výjimku místo úspěšného potvrzení, nakonfigurovaný jeden retry nestačí.</li>
+<li>Na producerech používáme acks = 1, tj. při odesílání dat stačí potvrzení leadera. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které ještě nebyly odeslané replikám. Řádově se jedná o desítky až stovky zpráv.</li>
+<li>Konzumeři se občas mocinky moc zblázní. Kreativně. Výše jsou popsané duplikace, ale už jsme u několika mála partition a konzumer grup viděli i ztrátu offsetů. Podle logů byla pravděpodobně způsobená chvilkovou nedostupností dat. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací auto.offset.reset = earliest způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několik dnů. Od jisté doby už nepoužíváme earlieast, ale latest s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat a znovuzpracovávat. Samozřejmě záleží na službě a očekáváních.</li>
+</ul>
+
+<p class="img"><img src="img/mirror_lag.png" /></p>
+
+<p>Pokud je pravda, co říká dokumentace o graceful shutdownu, leader by měl být dostupný v každém okamžiku.</p>
+
+</div>
+</body>
+</html>
