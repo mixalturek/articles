@@ -20,7 +20,7 @@
 
 <p>V naší konfiguraci taková situace kvůli timeoutům a následným pokusům o opětovné odeslání může občas (zřídka) nastat a v dostatečně malém množství nám nevadí, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
 
-<p>Začátek problémů celkem jasně korespondoval s aktualizací a restartem jednoho Kafka brokeru. Zkušenosti říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad budeme mít také.</p>
+<p>Začátek problémů celkem jasně korespondoval s aktualizací jednoho Kafka brokeru z 0.10.1.1 na 0.10.2.1 a následným restartem. Zkušenosti s rolling restartem Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad budeme mít také.</p>
 
 
 <h2>Systém z výšky jednoho kilometru</h2>
@@ -32,6 +32,7 @@
 <p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud události vyčítají finální konzumeři do Hadoopu/HDFS, do Elastic Searche, popř. se jedná o stream processing.</p>
 
 <p class="img"><img src="img/kafka_pipeline.png" /></p>
+
 
 <h2>Duplicity, duplicity, duplicity</h2>
 
@@ -51,9 +52,9 @@
 
 <p>Proč jsou restarty Kafky vždycky tak křehké jako napůl vysušený hrad z písku? A proč to nikdo jiný než my neřeší? Tohle přece musí vadit každému. Žádný ticket, žádný článek, žádný blog.</p>
 
-<p>Chvíle ticha.</p>
+<p>Chvíle ticha...</p>
 
-<p>A co když je problém jenom u nás na serverech? Když spouštím Kafku u sebe při vývoji, je typicky všechno v pořádku. Ale u mě neteče třicet tisíc zpráv za vteřinu, může být rozdíl v tom? Pojďme to už jednou pro vždy vyřešit!</p>
+<p>A co když je problém jenom u nás na serverech? Když spouštím Kafku u sebe při vývoji, je typicky všechno v pořádku. Ale je pravda, že u mě neteče třicet tisíc zpráv za vteřinu, může být rozdíl v tom? Pojďme to už jednou pro vždy vyřešit!</p>
 
 <p>Pozorované symptomy</p>
 
@@ -61,13 +62,63 @@
 <li>Kafka po restartu vždy přepočítává spousty koruptovaných souborů s indexy. Tato operace běžně trvá i <strong>několik hodin</strong> a opravdu bolí. Jeden rolling restart celého clusteru trvá běžně celý den. Update na novou verzi potřebuje v obecném případě dva restarty a clusterů máme několik. Zkrátka obrovské au.</li>
 <li>Pokud se Kafka po zastavení hned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID  je stále registrované a je třeba chvíli počkat na timeout.</li>
 <li>Producerům se v okamžiku restartu nedaří zapisovat do partition, jejichž leader je při rebalancingu migrován na ostatní brokery z ISR (In Sync Replicas). Callback v klientu obdrží výjimku místo úspěšného potvrzení, nakonfigurovaný jeden retry nestačí.</li>
-<li>Na producerech používáme acks = 1, tj. při odesílání dat stačí potvrzení leadera. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které ještě nebyly odeslané replikám. Řádově se jedná o desítky až stovky zpráv.</li>
-<li>Konzumeři se občas mocinky moc zblázní. Kreativně. Výše jsou popsané duplikace, ale už jsme u několika mála partition a konzumer grup viděli i ztrátu offsetů. Podle logů byla pravděpodobně způsobená chvilkovou nedostupností dat. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací auto.offset.reset = earliest způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několik dnů. Od jisté doby už nepoužíváme earlieast, ale latest s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat a znovuzpracovávat. Samozřejmě záleží na službě a očekáváních.</li>
+<li>Na producerech používáme <code>acks = 1</code>, tj. při odesílání dat stačí potvrzení leadera. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které ještě nebyly odeslány replikám. Řádově se jedná o desítky až stovky zpráv.</li>
+<li>Konzumeři se občas opravdu škaredě zblázní. Kreativně. Výše jsou popsané duplikace, ale už jsme u několika mála partition a konzumer grup viděli i ztrátu offsetů, což by nemělo nikdy nastat. Podle logů byla pravděpodobně způsobená chvilkovou nedostupností dat. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několik dnů. Od jisté doby už nepoužíváme earlieast, ale latest s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat a znovuzpracovávat. Samozřejmě záleží na službě a očekáváních.</li>
 </ul>
 
 <p class="img"><img src="img/mirror_lag.png" /></p>
 
-<p>Pokud je pravda, co říká dokumentace o graceful shutdownu, leader by měl být dostupný v každém okamžiku.</p>
+
+<h2>Ukončujeme Kafku</h2>
+
+<p>Nyní jsou dvě možné varianty, buď máme Kafku špatně nakonfigurovanou nebo ji ukončujeme špatně. <a href="http://kafka.apache.org/documentation/#basic_ops_restarting">Dokumentace o restartech</a> hovoří jasně.</p>
+
+<ul>
+<li>Vypínaný server synchronizuje všechny logy na disk, aby zamezil potřebě jakýchkoli oprav. Případné opravy trvají dlouho a pokud nejsou nutné, úmyslné restarty budou rychlejší.</li>
+<li>Vypínaný server namigruje všechny partition, u kterých je veden jako leader, na ostatní repliky. Toto minimalizuje čas, kdy je partition nedostupná na několik milisekund.</li>
+</ul>
+
+<p>Synchronizace souborů na disk by měla být aktivní vždy nezávisle na konfiguraci, migrace leaderů, pouze pokud je v konfiguraci uvedeno <code>controlled.shutdown.enable = true</code>. V konfiguračním souboru tuto volbu máme uvedenou, takže problém by měl být někde jinde.</p>
+
+<p>Jak správně ukončit Kafku? Skript <code>kafka-server-stop.sh</code> používá signál <code>SIGTERM</code>.</p>
+
+<pre>
+#!/bin/sh
+# ...
+PIDS=$(ps ax | grep -i 'kafka\.Kafka' | grep java | grep -v grep | awk '{print $1}')
+
+if [ -z "$PIDS" ]; then
+  echo "No kafka server to stop"
+  exit 1
+else.
+  kill -s TERM $PIDS
+fi
+</pre>
+
+<p>Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> v Upstart konfiguraci explicitně uvedenou nemáme, ale výchozí hodnotou je <code>SIGTERM</code>. Pokud by se proces neukončil, Upstart po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">kill timeoutu (ve výchozím stavu 5 sekund) zabíjí proces signálem <code>SIGKILL</code></a>. Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Bohužel vyhráno nemáme. Skript explicitně uvádí <a href="http://upstart.ubuntu.com/cookbook/#kill-timeout">kill timeout 300</a>, což není žádných 5 sekund ale 5 minut - opravdu štědrý timeout.</p>
+
+<pre>
+exec /bin/su -s /bin/sh - kafka -c '/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties'
+# wait on stop (to fix restart) for two reasons
+# 1) avoid jmx/rmi 'port already in use'
+# 2) wait for the session to expire in ZK to avoid start-up fail
+post-stop exec sleep 11
+respawn
+respawn limit 3 30
+
+# http://upstart.ubuntu.com/wiki/Stanzas
+# time to wait between sending TERM and KILL signals
+kill timeout 300
+
+start on stopped rc RUNLEVEL=[2345]
+stop on runlevel [S016]
+</pre>
+
+<p>Všechno bychom tedy měli mít nastaveno správně. Kde by jenom mohla být chyba? Je v Kafce nebo Upstartu nějaký bug?</p>
+
+<p>Než budete pokračovat a číst dál, zkuste se zamyslet. Představte si, že jste se dostali k poslední stránce napínavé detektivky, víte, že už máte všechny potřebné informace o tom, kdo je vrah. <strong>Kdo je tedy vrah?</strong> Kdo bez jakýchkoli rozpaků brutálně zabíjí Kafku signálem <code>SIGKILL</code>?</p>
+
+<p>Ano, správně. Někdo, o kom se mluví málo, ale kdo byl vždy přítomen, téměř neviditelný pomocník <code>/bin/su</code>.</p>
 
 </div>
 </body>
