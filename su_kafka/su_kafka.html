@@ -55,7 +55,7 @@
 
 <p>Chvíle ticha...</p>
 
-<p>A co když je problém jenom u nás na serverech? Když spouštím Kafku u sebe při vývoji, je typicky všechno v pořádku. Ale je pravda, že u mě neteče třicet tisíc zpráv za vteřinu, může být rozdíl v tom? Pojďme to už jednou pro vždy vyřešit!</p>
+<p>A co když je problém jenom u nás na serverech? Když spouštím Kafku u sebe při vývoji, je typicky všechno v pořádku. Ale je pravda, že u mě neteče třicet tisíc zpráv za vteřinu, může být rozdíl v tom? Pojďme to už jednou provždy vyřešit!</p>
 
 <p>Pozorované symptomy</p>
 
@@ -64,10 +64,12 @@
 <li>Pokud se Kafka po zastavení hned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID  je stále registrované a je třeba chvíli počkat na timeout.</li>
 <li>Producerům se v okamžiku restartu nedaří zapisovat do partition, jejichž leader je při rebalancingu migrován na ostatní brokery z ISR (In Sync Replicas). Callback v klientu obdrží výjimku místo úspěšného potvrzení, nakonfigurovaný jeden retry nestačí.</li>
 <li>Na producerech používáme <code>acks = 1</code>, tj. při odesílání dat stačí potvrzení leadera. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které ještě nebyly odeslány replikám. Řádově se jedná o desítky až stovky zpráv.</li>
-<li>Konzumeři se občas opravdu škaredě zblázní. Kreativně. Výše jsou popsané duplikace, ale už jsme u několika mála partition a konzumer grup viděli i ztrátu offsetů, což by nemělo nikdy nastat. Podle logů byla pravděpodobně způsobená chvilkovou nedostupností dat. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několik dnů. Od jisté doby už nepoužíváme earlieast, ale latest s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat a znovuzpracovávat. Samozřejmě záleží na službě a očekáváních.</li>
+<li>Konzumeři se občas škaredě zblázní. A když říkám škaredě, myslím tím opravdu <strong>škaredě</strong>. Výše jsou popsané duplikace, ale už jsme u několika mála partition a konzumer grup viděli i ztrátu offsetů, což by nemělo nikdy nastat. Podle logů byla pravděpodobně způsobená chvilkovou nedostupností dat. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několik dnů. Od jisté doby už nepoužíváme earlieast, ale latest s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat a znovuzpracovávat. Samozřejmě záleží na službě a očekáváních.</li>
 </ul>
 
 <p class="img"><img src="img/mirror_lag.png" /></p>
+
+<p>Vypadá to, jako bychom Kafku neukončovali korektně. V hlavě se nám objevuje slovo <code>SIGKILL</code>, ale kdo by ho posílal?</p>
 
 
 <h2>Ukončujeme Kafku</h2>
@@ -96,7 +98,7 @@ else.
 fi
 </pre>
 
-<p>Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> v Upstart konfiguraci explicitně uvedenou nemáme, ale výchozí hodnotou je <code>SIGTERM</code>. Pokud by se proces neukončil, Upstart po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">kill timeoutu (ve výchozím stavu 5 sekund) zabíjí proces signálem <code>SIGKILL</code></a>. Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Bohužel vyhráno nemáme. Skript explicitně uvádí <a href="http://upstart.ubuntu.com/cookbook/#kill-timeout">kill timeout 300</a>, což není žádných 5 sekund ale 5 minut - opravdu štědrý timeout.</p>
+<p>Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> v Upstart konfiguraci explicitně uvedenou nemáme, nicméně výchozí hodnotou je předpokládaný <code>SIGTERM</code>. Pokud by se proces ale nestihl ukončit, Upstart by ho po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">kill timeoutu (ve výchozím stavu 5 sekund) zabil signálem <code>SIGKILL</code></a>. Ha! Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Konfigurace však explicitně uvádí <code>kill timeout 300</code>, což není žádných 5 sekund ale 5 minut. Autor zde byl opravdu štědrý a chtěl mít jistotu, že Kafka bude mít dost času. Na všech úrovních bychom tedy měli mít všechno nastaveno správně.</p>
 
 <pre>
 exec /bin/su -s /bin/sh - kafka -c '/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties'
@@ -115,11 +117,26 @@ start on stopped rc RUNLEVEL=[2345]
 stop on runlevel [S016]
 </pre>
 
-<p>Všechno bychom tedy měli mít nastaveno správně. Kde by jenom mohla být chyba? Je v Kafce nebo Upstartu nějaký bug?</p>
+<p>Kde by jenom mohla být chyba? Na světě není nic dokonalé, dokonce ani software, nějaký bug někde? Ale kde? :-(</p>
 
-<p>Než budete pokračovat a číst dál, zkuste se zamyslet. Představte si, že jste se dostali k poslední stránce napínavé detektivky, víte, že už máte všechny potřebné informace o tom, kdo je vrah. <strong>Kdo je tedy vrah?</strong> Kdo bez jakýchkoli rozpaků brutálně zabíjí Kafku signálem <code>SIGKILL</code>?</p>
+<p>Zkuste se zamyslet, než budete číst dál. Představte si, že jste se dostali k poslední stránce napínavé detektivky. Víte, že už máte všechny potřebné informace a logickou úvahou máte dojít k tomu, kdo je vrah. <strong>Kdo je tedy vrah?</strong> Kdo bez jakýchkoli rozpaků brutálně zabíjí Kafku signálem <code>SIGKILL</code>?</p>
 
-<p>Ano, správně. Někdo, o kom se mluví málo, ale kdo byl vždy přítomen, téměř neviditelný pomocník <code>/bin/su</code>.</p>
+
+<h2>su kafka</h2>
+
+<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor se <code>sticky bitem</code> a bývá mnohokrát skloňován snad v každé knize o bezpečnosti v unixových prostředích (např. <a href="https://www.dwheeler.com/secure-programs/">Secure Programming HOWTO</a>). Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
+
+<p>Anketa: Zabíjí <code>/bin/su</code> potomka signálem <code>SIGKILL</code>?</p>
+
+<ul>
+<li>Ano.</li>
+<li>Ne.</li>
+<li>Jiné.</li>
+<li>Nevím.</li>
+</ul>
+
+
+<p>V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem.</p>
 
 </div>
 </body>
