@@ -2,20 +2,21 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>su kafka</title>
+    <title>Patálie s Apache Kafkou a /bin/su</title>
 
     <style media="all">
         body { background-color: silver; font-family: sans-serif; text-align: justify; line-height: 1.4em; }
         #page { margin: auto; width: 90em; background-color: white; padding: 2em; border: 1px solid black; }
         .img { text-align: center; }
-        pre { border: 1px solid gray; padding: 1em; }
+        pre { border: 1px solid gray; padding: 1em; background-color: #eeeeee; }
+        .highlight { font-weight: bold; color: orange; }
     </style>
 </head>
 
 <body>
 <div id="page">
 
-<h1>su kafka</h1>
+<h1>Patálie s Apache Kafkou a /bin/su</h1>
 
 <p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a restartu jednoho z nodů Apache Kafka clusteru ve frankfurtském datacentru hlásit duplikace v konzumovaných zprávách.</p>
 
@@ -101,7 +102,7 @@ fi
 <p>Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> v Upstart konfiguraci explicitně uvedenou nemáme, nicméně výchozí hodnotou je předpokládaný <code>SIGTERM</code>. Pokud by se proces ale nestihl ukončit, Upstart by ho po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">kill timeoutu (ve výchozím stavu 5 sekund) zabil signálem <code>SIGKILL</code></a>. Ha! Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Konfigurace však explicitně uvádí <code>kill timeout 300</code>, což není žádných 5 sekund ale 5 minut. Autor zde byl opravdu štědrý a chtěl mít jistotu, že Kafka bude mít dost času. Na všech úrovních bychom tedy měli mít všechno nastaveno správně.</p>
 
 <pre>
-exec /bin/su -s /bin/sh - kafka -c '/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties'
+<span class="highlight">exec /bin/su -s /bin/sh - kafka -c '/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties'</span>
 # wait on stop (to fix restart) for two reasons
 # 1) avoid jmx/rmi 'port already in use'
 # 2) wait for the session to expire in ZK to avoid start-up fail
@@ -111,7 +112,7 @@ respawn limit 3 30
 
 # http://upstart.ubuntu.com/wiki/Stanzas
 # time to wait between sending TERM and KILL signals
-kill timeout 300
+<span class="highlight">kill timeout 300</span>
 
 start on stopped rc RUNLEVEL=[2345]
 stop on runlevel [S016]
@@ -135,8 +136,160 @@ stop on runlevel [S016]
 <li>Nevím.</li>
 </ul>
 
-
 <p>V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem.</p>
+
+
+<h2>Do hlubin /bin/su</h2>
+
+<p>Zkusme v rychlosti analyzovat chování /bin/su. V prvním terminálu pod rootem spustíme příkaz obdobný Upstart konfiguraci. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, proces JVM se při startu Kafky spouští úplně stejně (viz kód <code>kafka-server-start.sh</code>, resp. <code>kafka-run-class.sh</code>).</p>
+
+<pre>
+# Become root
+su -
+
+# Lower privileges and execute something
+exec /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60'
+</pre>
+
+<p>V druhém terminálu se podíváme na strom procesů. Oba příkazy /bin/su se zachovaly, <code>exec</code> nahradil pouze shell v potomcích. Tímto pokusem jsme zjistili, že Upstart posílá SIGTERM /bin/su a ne JVM procesu, ve kterém běží Kafka.</p>
+
+<pre>
+pstree | less
+
+# After first su
+init-+
+     |-xterm---bash---su---bash
+
+# After second su
+init-+
+     |-xterm---bash---su---su---sleep
+</pre>
+
+<p>Pokus číslo dva a <code>strace</code>. Jaká volání systému vykoná /bin/su po příchozím SIGTERMu?</p>
+
+<pre>
+strace /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60' 2> strace_su.log
+
+kill -s TERM 11827
+</pre>
+
+<p>Hledáme klíčová slova <code>kill</code>, <code>SIGTERM</code> a <code>SIGKILL</code>. Podle výstupu /bin/su nejdříve pošle potomkovi <code>SIGTERM</code>, poté počká 2 sekundy a aby mělo jistotu, zabije ho pomocí <code>SIGKILL</code>. <strong>Jenom dvě sekundy?</strong> Máme odpověď, ale proč jenom dvě sekundy?</p>
+
+<pre>
+...
+--- SIGTERM {si_signo=SIGTERM, si_code=SI_USER, si_pid=10805, si_uid=0} ---
+rt_sigreturn()                          = -1 EINTR (Interrupted system call)
+write(2, "\nSession terminated, killing she"..., 37
+Session terminated, killing shell...) = 37
+<span class="highlight">kill(11828, SIGTERM)                    = 0</span>
+...
+rt_sigprocmask(SIG_BLOCK, [CHLD], ~[INT QUIT KILL ALRM TERM STOP RTMIN RT_1], 8) = 0
+<span class="highlight">nanosleep({2, 0}, 0x7ffc0c569e40)       = 0</span>
+<span class="highlight">kill(11828, SIGKILL)                    = 0</span>
+write(2, " ...killed.\n", 12 ...killed.
+)           = 12
+rt_sigaction(SIGTERM, {SIG_DFL, [], SA_RESTORER, 0x7f4d60a62660}, NULL, 8) = 0
+kill(11827, SIGTERM)                    = 0
+--- SIGTERM {si_signo=SIGTERM, si_code=SI_USER, si_pid=11827, si_uid=0} ---
++++ killed by SIGTERM +++
+</pre>
+
+
+<h2>Zdrojové kódy /bin/su</h2>
+
+<p>Najít zdrojové kódy /bin/su není úplně jednoduché, ale jde to zvládnout. Na serverch s Kafkou toho času běží stařičký CentOS 6.</p>
+
+<pre>
+rpm -qf /bin/su
+coreutils-8.4-43.el6.x86_64
+</pre>
+
+<p>Po vyhledání balíku a konkrétní verze dorazíme na <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a>, což sice není autoritativní zdroj, ale pro naše účely postačí. Na stránce je zároveň uveden odkaz na zdrojový balík, ve kterém by se měly nacházet zdrojové kódy. Stáhneme ho a rozbalíme. Po chvíli hledání objevíme soubor <code>coreutils-pam.patch</code> a kód, který odpovídá výstupu <code>strace</code>.</p>
+
+<pre>
++  if (caught) {
++    fprintf(stderr, "\nSession terminated, killing shell...");
+<span class="highlight">+    kill (child, SIGTERM);</span>
++  }
++  /* Not checking retval on this because we need to call close session */
++  pam_setcred(pamh, PAM_DELETE_CRED | PAM_SILENT);
++  retval = pam_close_session(pamh, 0);
++  PAM_BAIL_P_VOID;
++  retval = pam_end(pamh, PAM_SUCCESS);
++  PAM_BAIL_P_VOID;
++  if (caught) {
+<span class="highlight">+    sleep(2);</span>
+<span class="highlight">+    kill(child, SIGKILL);</span>
++    fprintf(stderr, " ...killed.\n");
++    exit(-1);
++  }
+</pre>
+
+<p>Pravděpodobně se jedná o backport nějaké důležité funkcionality z upstream verze do starého systému. Autorem patche je pravděpodobně někdo z RedHatu.</p>
+
+    <p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze /bin/su</a>.</p>
+
+<pre>
+commit 8171142ab66e94a409224547b33381259a0c3f72
+Author: Ludwig Nussel &lt;ludwig.nussel@suse.de&gt;
+Date:   Tue Aug 17 13:21:44 2010 +0200
+
+    pam support for su
+</pre>
+
+<p>Tento bug nebo možná pouze feature jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to nevypadá, že by změna v kódu byla někdy aplikována. Ačkoli změna proti současnému stavu dává smysl, protože by se /bin/su chovalo více konzistentně, nemáme motivaci se ji pokusit protlačit.</p>
+
+
+<h2>Není su jako su</h2>
+
+<p>Nyní v článku trochu odbočíme a budeme se věnovat jednomu překvapivému zjištění. Pokud byste si zkusili výše uvedené příklady na Debianu, nebudou vám vůbec fungovat. Výstup <code>strace</code> od pohledu vypadá úplně jinak a hlavně neobsahuje žádný <code>SIGKILL</code>.</p>
+
+<pre>
+...
+--- SIGTERM {si_signo=SIGTERM, si_code=SI_USER, si_pid=30289, si_uid=0} ---
+rt_sigreturn()                          = -1 EINTR (Interrupted system call)
+write(2, "\n", 1
+)                       = 1
+open("/usr/share/locale/locale.alias", O_RDONLY|O_CLOEXEC) = 7
+fstat(7, {st_mode=S_IFREG|0644, st_size=2492, ...}) = 0
+mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f5f5e7dc000
+read(7, "# Locale name alias data base.\n#"..., 4096) = 2492
+read(7, "", 4096)                       = 0
+close(7)                                = 0
+munmap(0x7f5f5e7dc000, 4096)            = 0
+open("/usr/share/locale/en_US/LC_MESSAGES/shadow.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+open("/usr/share/locale/en/LC_MESSAGES/shadow.mo", O_RDONLY) = -1 ENOENT (No such file or directory)
+write(2, "Session terminated, terminating "..., 40Session terminated, terminating shell...) = 40
+<span class="highlight">kill(4294936960, SIGTERM)               = 0</span>
+rt_sigaction(SIGALRM, {0x55b0bac7ef90, [ALRM], SA_RESTORER|SA_RESTART, 0x7f5f5de3d0e0}, {SIG_DFL, [], SA_RESTORER, 0x7f5f5de3d0e0}, 8) = 0
+rt_sigaction(SIGCHLD, {0x55b0bac7ef30, [CHLD], SA_RESTORER|SA_RESTART, 0x7f5f5de3d0e0}, {SIG_DFL, [], 0}, 8) = 0
+alarm(2)                                = 0
+rt_sigprocmask(SIG_BLOCK, [ALRM], NULL, 8) = 0
+wait4(30336, [{WIFSIGNALED(s) && WTERMSIG(s) == SIGTERM}], WNOHANG, NULL) = 30336
+rt_sigprocmask(SIG_UNBLOCK, [ALRM], NULL, 8) = 0
+write(2, " ...terminated.\n", 16 ...terminated.
+)       = 16
+...
+exit_group(143)                         = ?
++++ exited with 143 +++
+</pre>
+
+<p>Může za to stáří systému? CentOS 6 je výrazně starší než současný a taktéž hodně starý Debian Stable/Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi /bin/su a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
+
+<p>Pojďme si opět projít zdrojové kódy.</p>
+
+<pre>
+dpkg -S /bin/su
+login: /bin/su
+</pre>
+
+<p>Balík má jiné jméno - <a href="https://packages.debian.org/jessie/login">login</a> a zdrojový balík je také jiný - <a href="https://packages.debian.org/jessie/login">shadow</a>. Chyba v matrixu? Proč taková změna? Tentokrát nebudu napínat, <strong>/bin/su na Debianu je úplně jiná aplikace než /bin/su na CentOSu!</strong> Cože?! :-O</p>
+
+<p>Už je všechno v pořádku? Vstřebali jste to? Dobře, tak zavřete pusu. Debianí projekt sídlí na <a href="http://pkg-shadow.alioth.debian.org/">pkg-shadow.alioth.debian.org</a> a moc toho o sobě neříká. Vývojáři Debianu se možná rozhodli pro vlastní implementaci tohoto důležitého subsystému, aby ho měli plně pod kontrolou. Ale to jenom hádáme.</p>
+
+<p>Je moc hezké vidět principy objektového programování - více implementací interface s do detailů splněnými kontrakty - i na úrovni nejzákladnějších unixových utilit. Programátora zkrátka něco takového zahřeje na srdci ;-)</p>
+
+<p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v /bin/su, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem náhoda.</p>
 
 </div>
 </body>
