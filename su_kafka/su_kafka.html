@@ -227,7 +227,7 @@ coreutils-8.4-43.el6.x86_64
 
 <p>Pravděpodobně se jedná o backport nějaké důležité funkcionality z upstream verze do starého systému. Autorem patche je pravděpodobně někdo z RedHatu.</p>
 
-    <p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze /bin/su</a>.</p>
+<p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze /bin/su</a>.</p>
 
 <pre>
 commit 8171142ab66e94a409224547b33381259a0c3f72
@@ -290,6 +290,25 @@ login: /bin/su
 <p>Je moc hezké vidět principy objektového programování - více implementací interface s do detailů splněnými kontrakty - i na úrovni nejzákladnějších unixových utilit. Programátora zkrátka něco takového zahřeje na srdci ;-)</p>
 
 <p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v /bin/su, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem náhoda.</p>
+
+
+<h2>Jak z toho ven?</h2>
+
+<p>Vraťme se zpět k našemu problému a především k možnostem jeho řešení. Je jasné, že patchovat a provozovat vlastní verzi /bin/su není něco, do čeho by se nám zrovna chtělo. Nicméně použití tohoto nástroje byla čistě naše volba a nikdo nás do něho nenutí.</p>
+
+
+<h3>su, sudo</h3>
+
+<p>Co je vlastně hlavním nedostatkem /bin/su (v této situaci, ne obecně)? Především to, že s ním vzniká hned několik podprocesů a Upstart operuje s PID předka místo potomka. Na začátku se spouští /bin/su, /bin/su spouští login shell a shell spouští příkaz uvedený v parametrech. A při ukončování procesu Upstart posílá SIGTERM /bin/su a ne Kafce. Tento řetěz několika fork-exec operací je mnohem složitější, než by mohl být. Místo něj by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který přepíše současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj vůbec navrženy, a je tedy zbytečné je dále uvažovat.</p>
+
+
+<h3>Upstart</h3>
+
+<p>Úplně nejjednodušší by bylo pomocí direktivy <a href="http://upstart.ubuntu.com/cookbook/#setuid"><code>setuid &lt;username&gt;</code></a> požádat Upstart, aby špinavou práci s přepínáním uživatele odvedl sám a nás tím nezatěžoval. Bohužel tato možnost je dostupná až od verze 1.4, kdežto v CentOSu 6 se nachází výrazně starší 0.6.5.</p>
+
+<p>Dokumentace Upstartu diskutuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit job pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou v Debianu a Ubuntu, která "jednoduše spoustí (exec) daný příkaz poté, co změní UID/GID", což je přesně to, k čemu jsme došli sami. U su a sudo uvádí další nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>. Téměř na konci této sekce dokumenace je mezi příklady se su a sudo jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
+
+<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně".</p>
 
 </div>
 </body>
