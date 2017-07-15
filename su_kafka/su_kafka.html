@@ -125,7 +125,7 @@ stop on runlevel [S016]
 
 <h2>su kafka</h2>
 
-<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor se <code>sticky bitem</code> a bývá mnohokrát skloňován snad v každé knize o bezpečnosti v unixových prostředích (např. <a href="https://www.dwheeler.com/secure-programs/">Secure Programming HOWTO</a>). Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
+<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor se <code>sticky bitem</code> a bývá mnohokrát skloňován snad v každé knize o bezpečnosti v unixových prostředích. Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
 
 <p>Anketa: Zabíjí <code>/bin/su</code> potomka signálem <code>SIGKILL</code>?</p>
 
@@ -304,11 +304,28 @@ login: /bin/su
 
 <h3>Upstart</h3>
 
-<p>Úplně nejjednodušší by bylo pomocí direktivy <a href="http://upstart.ubuntu.com/cookbook/#setuid"><code>setuid &lt;username&gt;</code></a> požádat Upstart, aby špinavou práci s přepínáním uživatele odvedl sám a nás tím nezatěžoval. Bohužel tato možnost je dostupná až od verze 1.4, kdežto v CentOSu 6 se nachází výrazně starší 0.6.5.</p>
+<p>Úplně nejjednodušší by bylo pomocí direktivy <a href="http://upstart.ubuntu.com/cookbook/#setuid"><code>setuid &lt;username&gt;</code></a> požádat Upstart, aby špinavou práci s přepínáním uživatele odvedl sám a nás tím nezatěžoval. Bohužel tato možnost je dostupná až od verze 1.4, kdežto v CentOSu 6 je dostupná pouze výrazně starší 0.6.5. Update kvůli podobnému problému by byl pouze v říši fantazie.</p>
 
-<p>Dokumentace Upstartu diskutuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit job pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou v Debianu a Ubuntu, která "jednoduše spoustí (exec) daný příkaz poté, co změní UID/GID", což je přesně to, k čemu jsme došli sami. U su a sudo uvádí další nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>. Téměř na konci této sekce dokumenace je mezi příklady se su a sudo jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
+<p>Dokumentace Upstartu popisuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit job pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou v Debianu a Ubuntu, která "jednoduše spustí (exec) daný příkaz poté, co změní UID/GID", což je přesně to, k čemu jsme došli sami.  U su a sudo uvádí další dosud neuvažovanou nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>, což je při obyčejném spouštění aplikace spíše nežádoucí chování. Téměř na konci této sekce dokumentace je mezi příklady se su a sudo jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
 
-<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně".</p>
+<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně". Následuje několik odstavců o tom, jak se chovají různé typy aplikací, některé neforkují vůbec, jiné forkují jednou a ještě jiné dvakrát a co z toho plyne pro Upstart, který musí být schopen referencovat a spravovat správný process. Kdybychom si tuto část přečetli už kdysi, ušetřili bychom si všechny budoucí "zážitky" a problémy. S původní /bin/su variantou v konfiguračním souboru by bylo správné přidat dodatečný řádek <code>expect fork</code>, který by Upstartu oznámil, že má čekat právě jeden fork spouštěné aplikace. Tudíž by nespravoval /bin/su, ale Javu/Kafku. Tuto možnost jsme už ovšem nezkoušeli, protože jsme se rozhodli jít původně naznačenou cestou.</p>
+
+
+<h3>Přepnutí uživatele</h3>
+
+<p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je zajímavé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj, a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tata situaci se může porovnat například se su a sudo - dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude.</p>
+
+<ul>
+    <li><code>start-stop-daemon</code> - pouze Debian a deriváty</li>
+    <li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> - různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
+    <li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> - přepis Debianího toolu z Perlu do C</li>
+    <li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> - součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v /bin/su</a>, ale není ani v CentOSu ani v Debianu</li>
+    <li><a href="https://github.com/tianon/gosu">gosu</a> - používaný v kontejnerech a Docker světě</li>
+    <li>Python: <code><a href="https://docs.python.org/3/library/os.html">import os</a> ; os.setuid(...) ; os.exec*(...)</code>. Při použití pozor na <a href="https://www.dwheeler.com/secure-programs/Secure-Programs-HOWTO/environment-variables.html">reset prostředí</a>!</li>
+    <li>A spousty dalších možností...</li>
+</ul>
+
+<p>Shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (žádný fork), už ho máme na serverech, takže volba byla celkem jasná.</p>
 
 </div>
 </body>
