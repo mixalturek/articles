@@ -10,6 +10,7 @@
         .img { text-align: center; }
         pre { border: 1px solid gray; padding: 1em; background-color: #eeeeee; }
         .highlight { font-weight: bold; color: orange; }
+        div .side { border: 1px solid gray; margin: 1em 0 1em 1em; padding: 0 1em 0 1em; background-color: #eeeeee; float: right; max-width: 22%; }
     </style>
 </head>
 
@@ -22,8 +23,19 @@
 
 <p>V naší konfiguraci taková situace kvůli timeoutům a následným pokusům o opětovné odeslání může občas (zřídka) nastat a v dostatečně malém množství nám nevadí, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
 
-<p>Začátek problémů celkem jasně korespondoval s aktualizací jednoho Kafka brokeru z 0.10.1.1 na 0.10.2.1 a následným restartem. Zkušenosti s rolling restartem Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad budeme mít také.</p>
+<p>Začátek problémů celkem jasně korespondoval s aktualizací jednoho Kafka brokeru z 0.10.1.1 na 0.10.2.1 a následným restartem. Zkušenosti s rolling restartem Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad v budoucnu budeme mít také.</p>
 
+
+<div class="side">
+    <h3>Apache Kafka</h3>
+    <p><a href="http://kafka.apache.org/">Apache Kafka</a> je platforma pro streamování dat. Perzistentně uložené záznamy drží na discích typicky několik dní a replikuje je do několika instancí pro případ selhání některé z nich. Horizontálně škáluje.</p>
+
+    <p>Kafka rozhodně není pomalá. Sekvenční čtení a zápis z/na disk jsou rychlostně srovnatelné s přístupem do paměti. Dále využívá <a href="http://kafka.apache.org/documentation/#maximizingefficiency">různé triky</a> jako například přímé kopírování dat z disku na síťovou kartu v kernel space. Autor článku už několikrát ve čtyř-nodovém clusteru viděl datové přenosy stovek MB/s, resp. vyšších stovek tisíc zpráv/s. Limitním faktorem bývá spíše rychlost síťových propojů než disků nebo Kafky.</p>
+
+    <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je konzumují. Produceři a konzumeři jsou naprosto nezávislé systémy a mají oddělený životní cyklus.</p>
+
+    <p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>, ale narozdíl od nich garantuje pořadí doručení - v jádru své architektury obsahuje datovou strukturu log. Díky této vlastnosti může být jednou z jejích dalších aplikací <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a>, kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají formu materialized view a dají se kdykoli přepočítat.</p>
+</div>
 
 <h2>Systém z výšky jednoho kilometru</h2>
 
@@ -31,7 +43,7 @@
 
 <p>Události z Kafky vyčítají Input Filtry, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v klientech, doplnění GeoIP informací a podobně. Data se zapisují zpět do stejné DC Kafky, ale do jinak pojmenovaných topiků.</p>
 
-<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud události vyčítají finální konzumeři do Hadoopu/HDFS, do Elastic Searche, popř. se jedná o stream processing.</p>
+<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud události vyčítají finální konzumeři do Hadoopu/HDFS, do Elasticsearche, samplují na stage a dev prostředí, popř. se stream zpracovává realtime.</p>
 
 <p class="img"><img src="img/kafka_pipeline.png" /></p>
 
@@ -325,7 +337,7 @@ login: /bin/su
     <li>A spousty dalších možností...</li>
 </ul>
 
-<p>Shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (žádný fork), už ho máme na serverech, takže volba byla celkem jasná.</p>
+<p>Shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
 
 </div>
 </body>
