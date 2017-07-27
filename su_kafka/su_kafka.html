@@ -6,11 +6,11 @@
 
     <style media="all">
         body { background-color: silver; font-family: sans-serif; text-align: justify; line-height: 1.4em; }
-        #page { margin: auto; width: 90em; background-color: white; padding: 2em; border: 1px solid black; }
+        #page { margin: auto; max-width: 70%; background-color: white; padding: 2em; border: 1px solid black; }
         .img { text-align: center; }
-        pre { border: 1px solid gray; padding: 1em; background-color: #eeeeee; }
+        pre { border: 1px solid gray; padding: 1em; background-color: #eeeeee; overflow: auto; }
         .highlight { font-weight: bold; color: orange; }
-        div .side { border: 1px solid gray; margin: 1em 0 1em 1em; padding: 0 1em 0 1em; background-color: #eeeeee; float: right; max-width: 22%; }
+        div .side { border: 1px solid gray; margin: 1em 0 1em 1em; padding: 0 1em 0 1em; background-color: #eeeeee; float: right; max-width: 25%; }
     </style>
 </head>
 
@@ -149,6 +149,61 @@ stop on runlevel [S016]
 </ul>
 
 <p>V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem.</p>
+
+
+<div class="side">
+<h3>Unix a procesy</h3>
+
+<p>V operačních systémech založených na Unixu se nové procesy vytvářejí pomocí kernelových volání <code>fork()</code> a <code>exec()</code>.</p>
+
+<p>Úkolem <code>fork()</code> je naklonovat současný proces do nového, který bude až na jedno číslo identický. Tímto číslem, je návratová hodnota funkce <code>fork()</code>. Rodičovský proces v ní obdrží identifikátor potomka a potomek nulu. Procesy se tak dozví, kým jsou, a v kódu se mohou dále rozhodnout, jaké operace budou vykonávat.</p>
+
+<p>Volání <code>exec()</code> umožňuje nahradit současný kontext procesu nějakým jiným. Z kopie předchozího procesu se tak stane úplně jiná aplikace.</p>
+
+<pre>
+<span style='color:#898887;'>// gcc -Wall -o forkexec forkexec.c</span>
+<span style='color:#898887;'>// ./forkexec</span>
+
+<span style='color:#006e28;'>#include </span><span style='color:#006e28;'>&lt;stdio.h&gt;</span>
+<span style='color:#006e28;'>#include </span><span style='color:#006e28;'>&lt;unistd.h&gt;</span>
+<span style='color:#006e28;'>#include </span><span style='color:#006e28;'>&lt;sys/wait.h&gt;</span>
+
+<span style='color:#0057ae;'>int</span> main(<span style='color:#0057ae;'>int</span> argc, <span style='color:#0057ae;'>char</span>* argv[]) {
+  pid_t pid = fork();
+
+  <b>if</b> (pid == -<span style='color:#b08000;'>1</span>) {
+    fprintf(stderr, <span style='color:#bf0303;'>&quot;Fork failed</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>);
+    <b>return</b> <span style='color:#b08000;'>1</span>;
+  } <b>else</b> <b>if</b> (pid == <span style='color:#b08000;'>0</span>) {
+    printf(<span style='color:#bf0303;'>&quot;Child: pid %d</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>, getpid());
+    execl(<span style='color:#bf0303;'>&quot;/bin/echo&quot;</span>, <span style='color:#bf0303;'>&quot;/bin/echo&quot;</span>,
+          <span style='color:#bf0303;'>&quot;Echo: Hello, world!&quot;</span>, NULL);
+    <b>return</b> <span style='color:#b08000;'>42</span>; <span style='color:#898887;'>// Never executed</span>
+  } <b>else</b> {
+    printf(<span style='color:#bf0303;'>&quot;Parent: pid %d, child %d</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>,
+           getpid(), pid);
+    <span style='color:#0057ae;'>int</span> status;
+    waitpid(pid, &amp;status, <span style='color:#b08000;'>0</span>);
+    printf(<span style='color:#bf0303;'>&quot;Parent: child exited %d</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>, status);
+    <b>return</b> <span style='color:#b08000;'>0</span>;
+  }
+}
+</pre>
+
+<pre>
+./forkexec
+Parent: pid 9574, child 9575
+Child: pid 9575
+Echo: Hello, world!
+Parent: child exited 0
+</pre>
+
+<p><code>fork()</code> a <code>exec()</code> se nemusí používat pouze společně. Pokud by se zavolal pouze <code>exec()</code>, nedošlo by k naklonování procesu a spuštěná aplikace by se pouze nahradila nějakou jinou. Přesně toho chceme dosáhnout v tomto článku.</p>
+
+<p>V případě samostatného volání <code>fork()</code> by se v potomku nenahradil současný kontext za jiný a v systému by defakto běžely dvě kopie původního procesu. Toho se využívá například ve webových serverech, kdy nginx nebo Apache vytváří skupinu tzv. worker procesů, kterým rodič přeposílá práci.</p>
+
+<p>Procesy se v systému označují unikátním identifikátorem PID (Process ID). Platné hodnoty začínají číslem 1 a končí konstantou definovanou v <code>/proc/sys/kernel/pid_max</code>, která má typicky hodnotu 32768 popř. 4194303. Procesy se organizují do stromové struktury, prvním spuštěným je <code>init</code> s PID 1 (System V init, Upstart, SystemD a další) a má speciální povinnosti.</p>
+</div>
 
 
 <h2>Do hlubin /bin/su</h2>
