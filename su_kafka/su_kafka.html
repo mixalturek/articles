@@ -7,6 +7,7 @@
     <style media="all">
         body { background-color: silver; font-family: sans-serif; text-align: justify; line-height: 1.4em; }
         #page { margin: auto; max-width: 70%; background-color: white; padding: 2em; border: 1px solid black; }
+        #perex { font-style: italic; }
         .img { text-align: center; overflow: auto; }
         pre { border: 1px solid gray; padding: 1em; background-color: #eeeeee; overflow: auto; }
         .highlight { font-weight: bold; color: orange; }
@@ -19,42 +20,46 @@
 
 <h1>Patálie s Apache Kafkou a /bin/su</h1>
 
-<p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a restartu jednoho z nodů Apache Kafka clusteru ve frankfurtském datacentru hlásit duplikace v konzumovaných zprávách.</p>
+<p id="perex">Když se Linux admin a programátor rozhodnou vyzkoumat příčinu problému, který je pravidelně otravuje při restartech jedné cloudové služby, můžou se postupně dostat opravdu hluboko.</p>
 
-<p>V naší konfiguraci taková situace kvůli timeoutům a následným pokusům o opětovné odeslání může občas (zřídka) nastat a v dostatečně malém množství nám nevadí, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+<p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a plánovaném restartu jednoho z nodů Apache Kafka clusteru ve frankfurtském datacentru hlásit duplikace v konzumovaných zprávách.</p>
 
-<p>Začátek problémů celkem jasně korespondoval s aktualizací jednoho Kafka brokeru z 0.10.1.1 na 0.10.2.1 a následným restartem. Zkušenosti s rolling restartem Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad v budoucnu budeme mít také.</p>
+<p>Nejsme banka a v naší konfiguraci může taková situace občas (zřídka) nastat a v dostatečně malém množství nám nevadí. Nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+
+<p>Začátek všech alertů celkem jasně korespondoval s aktualizací Kafka brokeru a následným restartem. Zkušenosti s rolling restarty Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad v budoucnu budeme mít také - zkrátka Kafka za nic nemohla.</p>
+
+<p>Osvěžíme si principy operačních systémů, setkáme se s tucty známých i neznámých termínů, objevíme nečekané v RedHat a Debian based distribucích a také se mimo jiné zanoříme do zdrojových kódů unixového nástroje, který lidstvo používá každý den už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
 
 
 <div class="side">
     <h3>Apache Kafka</h3>
-    <p><a href="http://kafka.apache.org/">Apache Kafka</a> je platforma pro streamování dat. Perzistentně uložené záznamy drží na discích typicky několik dní a replikuje je do několika instancí pro případ selhání některé z nich. Horizontálně škáluje.</p>
+    <p><a href="http://kafka.apache.org/">Apache Kafka</a> je platforma pro streamování dat ve formě zpráv či událostí. Produceři do ní zapisují a konzumeři z ní čtou. Perzistentně uložené záznamy drží Kafka na discích typicky několik dní a replikuje je do několika instancí pro případ selhání některé z nich. Horizontálně škáluje.</p>
 
-    <p>Kafka rozhodně není pomalá. Sekvenční čtení a zápis z/na disk jsou rychlostně srovnatelné s přístupem do paměti. Dále využívá <a href="http://kafka.apache.org/documentation/#maximizingefficiency">různé triky</a> jako například přímé kopírování dat z disku na síťovou kartu v kernel space. Autor článku už několikrát ve čtyř-nodovém clusteru viděl datové přenosy stovek MB/s, resp. vyšších stovek tisíc zpráv/s. Limitním faktorem bývá spíše rychlost síťových propojů než disků nebo Kafky.</p>
+    <p>Kafka rozhodně není pomalá. Sekvenční čtení a zápis z/na disk jsou rychlostně srovnatelné s přístupem do paměti. Dále využívá <a href="http://kafka.apache.org/documentation/#maximizingefficiency">různé triky</a> jako je například přímé kopírování dat z disku na síťovou kartu v kernel space bez zbytečného kopírování bufferů do user space a zpět. Autor článku už několikrát ve čtyř-nodovém clusteru pozoroval datové přenosy stovek MB/s, resp. vyšších stovek tisíc zpráv/s. Limitním faktorem bývá spíše rychlost síťových propojů než disků nebo kódu Kafky.</p>
 
-    <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je konzumují. Produceři a konzumeři jsou naprosto nezávislé systémy a mají oddělený životní cyklus.</p>
+    <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je konzumují. Produceři a konzumeři jsou naprosto nezávislé systémy a mají plně oddělený životní cyklus, spojuje je pouze formát přenášených zpráv.</p>
 
-    <p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>, ale narozdíl od nich garantuje pořadí doručení - v jádru své architektury obsahuje datovou strukturu log. Díky této vlastnosti může být jednou z jejích dalších aplikací <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a>, kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají formu materialized view a dají se kdykoli přepočítat.</p>
+    <p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>. Narozdíl od nich garantuje pořadí doručení, v jádru své architektury obsahuje datovou strukturu <em>log</em>. Díky této vlastnosti může být jednou z jejích dalších aplikací <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a>, kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají formu materialized view a dají se kdykoli přepočítat.</p>
 </div>
 
 <h2>Systém z výšky jednoho kilometru</h2>
 
-<p>Náš systém pro analýzu dat má především kvůli možnosti škálovat do datacenter dvě vrstvy oddělených Kafka clusterů. Přijímací Kafka běží ve čtyřech datacentrech rozložených různě po světě. Zapisuje do nich Receiver, což je v podstatě REST-like proxy pro Kafka producer, který mimo jiné do událostí vyplňuje IP adresy protistrany a čas příjmu dat. Kafka slouží jako distribuovaný perzistentní log. Ve chvíli, kdy je do ní libovolná zpráva uložena, máme několik dnů na její vykonzumování a zpracování. Receiver a DC Kafka jsou tedy základem stability systému a musí vždy spolehlivě běžet.</p>
+    <p>Námi vytvořený systém pro <em>big data</em> analýzy používá dvě vrstvy oddělených Kafka clusterů. Přijímací Kafka běží ve čtyřech datacentrech rozložených různě po světě. Zapisuje do nich Receiver, což je v podstatě REST-like proxy s Kafka producerem. Mimo jiné do událostí vyplňuje IP adresu protistrany a čas příjmu dat. Kafka slouží jako distribuovaný perzistentní log. Ve chvíli, kdy je do ní libovolná zpráva úspěšně uložena, máme několik dnů na její vyčtení a zpracování. Receiver aplikace a DC Kafky jsou tedy základem stability systému a musí vždy spolehlivě běžet.</p>
 
-<p>Události z Kafky vyčítají Input Filtry, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v klientech, doplnění GeoIP informací a podobně. Data se zapisují zpět do stejné DC Kafky, ale do jinak pojmenovaných topiků.</p>
+<p>Události z Kafky vyčítají Input Filtry, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v klientech, obohacení události o GeoIP a podobně. Data se zapisují zpět do stejné DC Kafky, ale do jinak pojmenovaných topiků.</p>
 
-<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud události vyčítají finální konzumeři do Hadoopu/HDFS, do Elasticsearche, samplují na stage a dev prostředí, popř. se stream zpracovává realtime.</p>
+<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do master Kafky, odkud je dále vyčítají finální konzumeři do Hadoopu/HDFS, do Elasticsearche, samplují na stage a dev prostředí, popř. nad streamem běží realtime analýzy.</p>
 
 <p class="img"><img src="img/kafka_pipeline.png" /></p>
 
 
 <h2>Duplicity, duplicity, duplicity</h2>
 
-<p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách Kafka pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní UUID.randomUUID() pro zpárování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví dvakrát, je to jasná známka duplikace, ať už vznikla kdekoli.</p>
+    <p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách Kafka pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní <code>UUID.randomUUID()</code> pro zpárování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví více než jednou, je to jasná známka duplikace.</p>
 
 <p>Jelikož počátek duplikací časově korespondoval s restartem Kafka brokeru ve franskfurtském datacentru, dalo se předpokládat, že je na vině některý ze systémů, který přímo komunikuje s Kafkou, tj. Receiver (producer), Filtry (konsumer, producer), ostatní Kafka brokeři ve frankfurtu (repliky) nebo Mirror maker (konzumer).</p>
 
-<p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurkt bylo vše ihned jasné. Stačil jednoduchý restart procesu a trafik se opět skokově snížil na původní hodnutu a integrační testy se znovu samým štěstím zazelenaly.</p>
+<p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurkt bylo vše ihned jasné. Po restartu se datový přenos skokově snížil zpět na původní hodnotu a integrační testy znovu samým štěstím zezelenaly.</p>
 
 <p class="img"><img src="img/duplicates_mirrors_all.png" /></p>
 <p class="img"><img src="img/duplicates_mirrors_fra.png" /></p>
