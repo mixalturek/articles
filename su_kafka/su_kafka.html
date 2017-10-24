@@ -20,15 +20,15 @@
 
 <h1>Patálie s Apache Kafkou a /bin/su</h1>
 
-<p id="perex">Když se Linux admin a programátor rozhodnou vyzkoumat příčinu problému, který je pravidelně otravuje při restartech jedné cloudové služby, můžou se postupně dostat opravdu hluboko.</p>
+<p id="perex">Když se jeden Linux admin a jeden backend vývojář rozhodnou vyzkoumat příčinu problému, který je pravidelně otravuje při restartech distribuované cloudové služby, můžou se postupně dostat opravdu hluboko...</p>
 
-<p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a plánovaném restartu jednoho z nodů Apache Kafka clusteru ve frankfurtském datacentru hlásit duplikace v konzumovaných zprávách.</p>
+<p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a plánovaném restartu jednoho z nodů <a href="http://kafka.apache.org/">Apache Kafka</a> clusteru hlásit duplikace v konzumovaných zprávách.</p>
 
-<p>Nejsme banka a v naší konfiguraci může taková situace občas (zřídka) nastat a v dostatečně malém množství nám nevadí. Nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl, pokud nastanou jednotky až stovky duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+<p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat. Nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi jednotkami až stovkami duplicit denně, nebo jestli jich jsou tisíce za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
 
-<p>Začátek všech alertů celkem jasně korespondoval s aktualizací Kafka brokeru a následným restartem. Zkušenosti s rolling restarty Kafky říkají, že se jedná o spíše křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné a lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad v budoucnu budeme mít také - zkrátka Kafka za nic nemohla.</p>
+    <p>Začátek všech alertů celkem jasně korespondoval s aktualizací prvního Kafka brokeru a následným restartem. Zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, přesně o tom je tento článek. My už je snad budeme mít v budoucnu také - <em>zkrátka Kafka za nic nemohla</em>.</p>
 
-<p>Osvěžíme si principy operačních systémů, setkáme se s tucty známých i neznámých termínů, objevíme nečekané v RedHat a Debian based distribucích a také se mimo jiné zanoříme do zdrojových kódů unixového nástroje, který lidstvo používá každý den už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
+<p>Osvěžíme si principy operačních systémů, setkáme se s tucty známých i méně známých termínů, objevíme naprosto nečekané rozdíly v RedHat a Debian based distribucích a také se mimo jiné zanoříme do zdrojových kódů unixového nástroje, který lidstvo denně používá už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
 
 
 <div class="side">
@@ -44,7 +44,7 @@
 
 <h2>Systém z výšky jednoho kilometru</h2>
 
-    <p>Námi vytvořený systém pro <em>big data</em> analýzy používá dvě vrstvy oddělených Kafka clusterů. Přijímací Kafka běží ve čtyřech datacentrech rozložených různě po světě. Zapisuje do nich Receiver, což je v podstatě REST-like proxy s Kafka producerem. Mimo jiné do událostí vyplňuje IP adresu protistrany a čas příjmu dat. Kafka slouží jako distribuovaný perzistentní log. Ve chvíli, kdy je do ní libovolná zpráva úspěšně uložena, máme několik dnů na její vyčtení a zpracování. Receiver aplikace a DC Kafky jsou tedy základem stability systému a musí vždy spolehlivě běžet.</p>
+    <p>Námi vytvořený systém pro <em>big data</em> analýzy používá na příjmové straně dvě vrstvy oddělených Kafka clusterů. Jedny Kafky běží ve čtyřech datacentrech rozložených různě po světě. Zapisuje do nich Receiver, což je v podstatě REST-like proxy s Kafka producerem. Mimo jiné do událostí vyplňuje IP adresu protistrany a čas příjmu dat. Kafka slouží jako distribuovaný perzistentní log. Ve chvíli, kdy je do ní libovolná zpráva úspěšně uložena, máme několik dnů na její vyčtení a zpracování. Receiver aplikace a DC Kafky jsou tedy základem stability systému a musí vždy spolehlivě běžet.</p>
 
 <p>Události z Kafky vyčítají Input Filtry, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v klientech, obohacení události o GeoIP a podobně. Data se zapisují zpět do stejné DC Kafky, ale do jinak pojmenovaných topiků.</p>
 
