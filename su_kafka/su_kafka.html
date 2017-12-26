@@ -24,20 +24,20 @@
 
 <p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a plánovaném restartu jednoho z nodů <a href="http://kafka.apache.org/">Apache Kafka</a> clusteru hlásit duplikace v konzumovaných zprávách.</p>
 
-<p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi jednotkami až stovkami duplicit denně nebo tisíci za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+<p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi desítkami až stovkami duplicit denně nebo tisíci za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
 
-<p>Začátek všech alertů v čase celkem jasně korespondoval s aktualizací prvního Kafka brokeru a následným restartem. Naše dosavadní zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, právě o tom je tento článek. My už je snad budeme mít v budoucnu také - <em>zkrátka chyba byla u nás a Kafka za nic nemohla</em>.</p>
+<p>Začátek všech alertů celkem jasně korespondoval s aktualizací první instance Kafky a následným restartem. Naše dosavadní zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, právě o tom je tento článek. My už je snad budeme mít v budoucnu také - <em>zkrátka chyba byla u nás a Kafka za nic nemohla</em>.</p>
 
-<p>Během analýzy si osvěžíme principy operačních systémů, setkáme se s tucty známých i méně známých termínů, objevíme naprosto nečekané rozdíly v RedHat a Debian based distribucích a také se mimo jiné zanoříme do zdrojových kódů jistého unixového nástroje, který lidstvo denně používá už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
+<p>Během zpětné analýzy si osvěžíme principy operačních systémů, setkáme se s tucty známých i méně známých termínů, objevíme naprosto nečekané rozdíly v distribucích založených na RedHatu a Debianu a také se mimo jiné zanoříme do zdrojových kódů jistého unixového nástroje, který lidstvo denně používá už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
 
 <p>Aby čtenář pochopil, jak vysoko se na aplikačním stacku běžně pohybujeme a jak hluboko do operačního systému jsme se přes všechny vrstvy se svými analýzami následně dostali, je třeba nejdříve nastínit, jak vypadá architektura celého řešení.</p>
 
 
 <div class="side">
     <h3>Apache Kafka</h3>
-    <p><a href="http://kafka.apache.org/">Apache Kafka</a> je platforma pro streamování dat. Sestává z distribuované serverové služby a dvojice klientských knihoven umožňujících produkci a konzumaci událostí. Veškeré záznamy drží na pevných discích typicky po dobu několika dní a zároveň je replikuje do více instancí pro případ selhání některé z nich. Horizontálně škáluje.</p>
+    <p><a href="http://kafka.apache.org/">Apache Kafka</a> je platforma pro streamování dat. Sestává z distribuované serverové služby a dvojice klientských knihoven umožňujících produkci a konzumaci událostí. Veškeré záznamy drží na pevných discích typicky po dobu jednotek dní a zároveň je replikuje do několika instancí pro případ selhání některé z nich. Horizontálně škáluje.</p>
 
-    <p>Ačkoli data ukládá na disk, rozhodně není pomalá. Sekvenční čtení/zápis většího množství bufferovaných dat z/na disk je rychlostně srovnatelný s přístupem do paměti. Kafka dále využívá <a href="http://kafka.apache.org/documentation/#maximizingefficiency">různé triky</a> jako například přímé kopírování z disku na síťovou kartu v kernel space. Tím se obchází zbytečné kopírování bufferů do user space a zpět. Autor článku už několikrát ve čtyř-nodovém clusteru pozoroval datové přenosy stovek MB/s, resp. vyšších stovek tisíc zpráv/s. Limitním faktorem bývá spíše rychlost síťových propojů než disků nebo aplikačního kódu Kafky.</p>
+    <p>Ačkoli data ukládá na disk, rozhodně není pomalá. Sekvenční čtení/zápis většího množství bufferovaných dat z/na disk je rychlostně srovnatelný s přístupem do paměti. Kafka dále využívá <a href="http://kafka.apache.org/documentation/#maximizingefficiency">různé triky</a> jako například přímé kopírování z disku na síťovou kartu v kernel space. Tím se obchází zbytečné kopírování bufferů do user space a zpět. Autor článku už několikrát ve čtyř-nodovém clusteru pozoroval datové přenosy stovek MB/s, resp. vyšších stovek tisíc zpráv/s. Limitním faktorem bývá spíše rychlost síťových propojů než disků nebo aplikačního kódu.</p>
 
     <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je zpracovávají. Producenti a konzumenti jsou naprosto nezávislé systémy a mají plně oddělený životní cyklus, spojuje je pouze formát přenášených zpráv.</p>
 
@@ -47,9 +47,9 @@
 
 <h2>Z výšky jednoho kilometru</h2>
 
-<p>Námi vyvinutý systém pro <em>big data</em> analýzy (v odpoledních špičkách řádově 100k událostí/s, 100 MB/s) používá na příjmové straně dvě vrstvy oddělených Kafka clusterů. První skupina backendů toho času běží ve čtyřech nezávislých datacentrech rozmístěných různě po světě. Především aby byly co nejblíže aplikacím u uživatelů produkujících události a zároveň dokázaly překlenout nejrůznější síťové nedostupnosti a nespolehlivosti internetu.</p>
+<p>Námi vyvinutý systém pro <em>big data</em> analýzy (v každodenních špičkách řádově 100k událostí/s, nekomprimovaných 100 MB/s) používá na příjmové straně dvě vrstvy oddělených Kafka clusterů. První skupina backendů toho času běží ve čtyřech nezávislých datacentrech rozmístěných různě po světě. Je to kvůli tomu, aby byly co nejblíže aplikacím u uživatelů, které produkují události, a zároveň aby dokázaly překlenout nejrůznější síťové nedostupnosti a nespolehlivosti Internetu.</p>
 
-<p>Do Kafka clusterů proudí vstupní data výhradně skrz aplikaci <em>Receiver</em>, jedná se v podstatě o REST-like proxy obsahující Kafka producent klienta a nepříliš složitou logiku. Ve chvíli, kdy Kafka potvrdí uložení přijaté události, máme v případě možných problémů teoreticky až několik dnů na opravu, znovuvyčtení a zpracování perzistovaných dat. Taková situace by rozhodně nebyla příjemná a určitě bychom se zapotili, nicméně by nemělo dojít k žádné ztrátě dat. Receiver a Kafka jsou tedy základem stability celého systému a musí vždy spolehlivě běžet.</p>
+<p>Do Kafka clusterů proudí vstupní data výhradně skrz aplikaci <em>Receiver</em>, jedná se v podstatě o REST-like proxy obsahující Kafka producent klienta a nepříliš složitou logiku. Ve chvíli, kdy Kafka potvrdí příjem události, máme v případě možných problémů teoreticky až několik dnů na opravu, znovuvyčtení a zpracování uložených dat. Taková situace by rozhodně nebyla příjemná a určitě bychom se zapotili, nicméně by nemělo dojít k žádné ztrátě událostí. Receiver a Kafka jsou tedy základem stability celého systému a musí vždy spolehlivě běžet.</p>
 
 <p>Události z Kafky vyčítají <em>Input Filtry</em>, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v historických verzích klientů, obohacení událostí o GeoIP lokace a podobně. Data se zapisují zpět do té samé DC Kafky, ale do topiků s jinými jmény.</p>
 
@@ -57,16 +57,16 @@
 
 <p class="img"><img src="img/kafka_pipeline.png" /></p>
 
-<p>Každá z aplikací běží replikovaně v několika instancích. Pro rychlou představu: Receiverů a Input Filtrů je 11, Kafka brokerů celkem 14, v rámci každého Kafka clusteru musí samozřejmě běžet i cluster <a href="https://zookeeper.apache.org/">ZooKeeperů</a>. Data z každého datacentra kopíruje 5 instancí Mirror makerů. Všichni konzumer klienti se dále replikují nejen na úrovni instancí a strojů, ale, aby se zvýšil paralelismus, i pomocí konfigurovatelného počtu aplikačních konzumer vláken. Objem zpracovávaných dat s připojováním a rozšiřováním jednotlivých aplikací v čase neustále narůstá. Základním požadavkem je možnost snadného škálování na všech úrovních, jinak by systém nebyl už dávno udržitelný.</p>
+<p>Každá z aplikací běží replikovaně v několika instancích. Pro rychlou představu: Receiverů a Input Filtrů je 11, Kafka brokerů celkem 14, v rámci každého Kafka clusteru musí samozřejmě běžet i cluster <a href="https://zookeeper.apache.org/">ZooKeeperů</a>. Data z každého datacentra kopíruje 5 instancí Mirror makerů. Všichni konzument klienti se dále replikují nejen na úrovni instancí a strojů, ale, aby se zvýšil paralelismus, i pomocí konfigurovatelného počtu aplikačních vláken. Objem zpracovávaných dat s připojováním a rozšiřováním jednotlivých aplikací v čase neustále narůstá. Základním požadavkem je možnost snadného škálování na všech úrovních, jinak by systém už dávno nebyl udržitelný.</p>
 
-<p>A v této změti distribuovaných aplikací, jejich jednotlivých instancí, strojů, aplikačních vláken, grafů a logů hledejte příčinu nějaké zřídka se vyskytující chyby...</p>
+<p>A v této změti distribuovaných aplikací, jejich jednotlivých instancí, strojů, aplikačních vláken, grafů a logů je třeba najít příčinu jisté zřídka se vyskytující chyby...</p>
 
 
 <h2>Duplicity, duplicity, duplicity</h2>
 
-<p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní <code>UUID.randomUUID()</code> pro zpárování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví více než jednou, je to jasná známka duplikace.</p>
+<p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní <code>UUID.randomUUID()</code> pro párování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví více než jednou, je to jasná známka duplikace.</p>
 
-<p>Jelikož počátek duplikací časově korespondoval s restartem prvního Kafka brokeru ve frankfurtském datacentru, dá se předpokládat, že je na vině Kafka nebo některý ze systémů, který s ní přímo komunikuje, tj. Receiver (producent), Input Filtry (konzument, producent), ostatní Kafka brokeři ve frankfurtu (repliky) nebo Mirror maker (konzument).</p>
+<p>Jelikož počátek duplikací časově korespondoval s restartem prvního Kafka brokeru ve frankfurtském datacentru, dá se předpokládat, že je na vině tato DC Kafka nebo některý ze systémů, který s ní přímo komunikuje, tj. Receiver (producent), Input Filtry (konzument, producent), ostatní Kafka brokeři ve frankfurtu (repliky) nebo Mirror maker (konzument).</p>
 
 <p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurkt bylo vše ihned jasné. Po restartu se datový přenos vrátil zpět na původní hodnoty a integrační testy znovu samým štěstím zezelenaly.</p>
 
@@ -82,15 +82,15 @@
 
 <p>(Chvíle ticha...)</p>
 
-<p>A co když se problém nachází jenom na našich serverech? Při vývoji se Kafka spouští v Dockeru na pracovním notebooku a typicky bývá všechno v pořádku. Nicméně je pravda, že v tomto případě jí protékají oproti třiceti tisíci zprávám za sekundu pouze malé desítky, může být rozdíl způsobený výrazně vyšším zatížením? Pojďme to už jednou provždy vyřešit!</p>
+<p>A co když se problém vyskytuje jenom u nás, na našich serverech? Při vývoji Kafku spouštíme v Dockeru na pracovních noteboocích a typicky bývá všechno v pořádku. Nicméně je pravda, že v tomto případě jí protékají oproti třiceti tisícům zpráv za sekundu pouze malé desítky. Může být rozdíl způsobený výrazně vyšším zatížením? Pojďme to už jednou provždy vyřešit!</p>
 
 <p>Pozorované symptomy:</p>
 
 <ul>
-<li>Kafka po restartu vždy přepočítává spousty koruptovaných indexů. Tato operace občas trvá i <strong>několik hodin</strong> a opravdu bolí. Jeden rolling restart celého clusteru trvá běžně celý den. Update na novou verzi potřebuje v obecném případě dva restarty a clusterů máme několik. Zkrátka obrovské au.</li>
-<li>Pokud se Kafka po zastavení ihned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID je v něm stále registrovaný a je třeba chvíli počkat na timeout. Do init skriptu vkládáme při restartu mezi start a stop oprace umělý sleep.</li>
+    <li>Kafka po restartu vždy přepočítává spousty koruptovaných indexů. Tato operace občas trvá i <strong>několik hodin</strong> a opravdu bolí. Jeden rolling restart celého clusteru trvá běžně celý den. Update na novou verzi potřebuje v obecném případě dva restarty a clusterů máme několik. Zkrátka obrovské <em>auuu</em>.</li>
+<li>Pokud se Kafka po zastavení ihned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID je v něm stále registrované a je třeba chvíli počkat na timeout. Do init skriptu vkládáme při restartu mezi start a stop oprace umělý sleep.</li>
 <li>Producentům se v okamžiku restartu nedaří zapisovat do partition, jejichž leader je při rebalancingu migrován na ostatní brokery z ISR (In Sync Replicas). Callback v klientu obdrží místo úspěšného potvrzení výjimku, nakonfigurovaný jeden retry nestačí.</li>
-<li>Na producentech používáme <code>acks = 1</code>, tj. při odesílání dat stačí potvrzení od leadera, aby se považovala za bezpečně uložená. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které ještě nebyly odeslány replikám. Řádově se jedná o malé desítky až stovky zpráv.</li>
+<li>Na producentech používáme <code>acks = 1</code>, tj. při odesílání dat stačí potvrzení od leadera, aby se považovala za bezpečně uložená. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které se ještě nestihly odeslat replikám. Řádově se jedná o malé desítky až stovky zpráv.</li>
 <li>Konzumenti se občas škaredě zblázní. A když píšu škaredě, myslím tím opravdu <strong>škaredě</strong>. Výše byl popsán problém s duplikacemi, ale už jsme u několika mála partition a skupin konzumentů viděli i ztrátu offsetů, což by nemělo nikdy, ale opravdu nikdy nastat. Podle logů byla tato ztráta pravděpodobně způsobená chvilkovou nedostupností dat, kdy Kafka nejspíše klientovi odpověděla aniž by byla plně inicializovaná. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několika dnů. Od jisté doby už nepoužíváme <code>earliest</code>, ale <code>latest</code> s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat, znovuzpracovávat a řešit, že všechna data máme v HDFS a dalších systémech dvakrát. Samozřejmě záleží na službě a očekáváních.</li>
 </ul>
 
@@ -101,7 +101,7 @@
 
 <h2>Ukončujeme Kafku</h2>
 
-<p>Nyní jsou ve hře dvě varianty, buď máme Kafku špatně nakonfigurovanou nebo ji ukončujeme špatně. <a href="http://kafka.apache.org/documentation/#basic_ops_restarting">Dokumentace o restartech</a> hovoří jasně:</p>
+<p>Nyní jsou ve hře dvě varianty, buď máme Kafku špatně nakonfigurovanou nebo ji ukončujeme špatně. <a href="http://kafka.apache.org/documentation/#basic_ops_restarting">Dokumentace o plánovaných restartech</a> hovoří jasně:</p>
 
 <ul>
 <li>Vypínaný server synchronizuje všechny logy na disk, aby zamezil potřebě jakýchkoli oprav. Případné opravy trvají dlouho a pokud nejsou nutné, úmyslné restarty budou rychlejší.</li>
@@ -116,16 +116,11 @@
 #!/bin/sh
 # ...
 PIDS=$(ps ax | grep -i 'kafka\.Kafka' | grep java | grep -v grep | awk '{print $1}')
-
-if [ -z "$PIDS" ]; then
-  echo "No kafka server to stop"
-  exit 1
-else.
-  kill -s TERM $PIDS
-fi
+# ...
+kill -s TERM $PIDS
 </pre>
 
-<p>Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> v Upstart konfiguraci explicitně uvedenou nemáme, nicméně výchozí hodnotou je předpokládaný <code>SIGTERM</code>. Pokud by se proces ale nestihl ukončit, Upstart by ho po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">kill timeoutu (ve výchozím stavu 5 sekund) zabil signálem <code>SIGKILL</code></a>. Ha! Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Konfigurace však explicitně uvádí <code>kill timeout 300</code>, což není žádných 5 sekund ale 5 minut. Autor zde byl opravdu štědrý a chtěl mít jistotu, že Kafka bude mít dost času. Na všech úrovních bychom tedy měli mít všechno nastaveno správně.</p>
+<p>Jako init daemon používáme Upstart. Direktivu <code><a href="http://upstart.ubuntu.com/cookbook/#kill-signal">kill signal</a></code> sice v konfiguraci explicitně uvedenou nemáme, nicméně výchozí hodnotou je předpokládaný <code>SIGTERM</code>. Pokud by se ale proces nestihl ukončit, Upstart by ho po <a href="http://upstart.ubuntu.com/cookbook/#daemon-behaviour">pětisekundovém timeoutu zabil signálem <code>SIGKILL</code></a>. Ha! Pět sekund je opravdu hodně málo a toto by mohla být příčina všech našich problémů. Konfigurace však explicitně uvádí <code>kill timeout 300</code>, což není žádných 5 sekund ale 5 minut. Autor konstanty zde byl opravdu štědrý a chtěl mít jistotu, že Kafka bude mít dost času - lepší si chvíli počkat.</p>
 
 <pre>
 <span class="highlight">exec /bin/su -s /bin/sh - kafka -c '/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/server.properties'</span>
@@ -144,35 +139,34 @@ start on stopped rc RUNLEVEL=[2345]
 stop on runlevel [S016]
 </pre>
 
-<p>Kde by jenom mohla být chyba? Na světě není nic dokonalé, dokonce ani software, nějaký bug někde? Ale kde? :-(</p>
+<p>Na všech úrovních bychom tedy měli mít všechno nastaveno správně. Kde by jenom mohla být chyba? Na světě není nic dokonalé, dokonce ani software, nějaký bug někde? Ale kde?</p>
 
-<p>Zkuste se zamyslet, než budete číst dál. Představte si, že jste se dostali k poslední stránce napínavé detektivky. Víte, že už máte všechny potřebné informace a logickou úvahou máte dojít k tomu, kdo je vrah. <strong>Kdo je tedy vrah?</strong> Kdo bez jakýchkoli rozpaků brutálně zabíjí Kafku signálem <code>SIGKILL</code>?</p>
+<p>Než budete číst dál, zkuste se zamyslet. Představte si, že jste se dostali k poslední stránce napínavé detektivky. Víte, že už máte všechny potřebné informace a logickou úvahou máte dojít k tomu, kdo je vrah. <strong>Kdo je tedy vrah?</strong> Kdo bez jakýchkoli rozpaků brutálně zabíjí Kafku signálem <code>SIGKILL</code>?</p>
 
 
 <h2>su kafka</h2>
 
-<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor se <code>sticky bitem</code> a bývá mnohokrát skloňován snad v každé knize o bezpečnosti v unixových prostředích. Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
+<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor s nastaveným <code>sticky bitem</code> a bývá často skloňován snad v každé knize o bezpečnosti v unixových prostředích. V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem. Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
 
-<p>Anketa: Zabíjí <code>/bin/su</code> potomka signálem <code>SIGKILL</code>?</p>
+<p>Anketa: Opravdu zabíjí <code>/bin/su</code> proces potomka signálem <code>SIGKILL</code>?</p>
 
 <ul>
 <li>Ano.</li>
 <li>Ne.</li>
+<li>Ne, to má být vtip?!</li>
 <li>Jiné.</li>
 <li>Nevím.</li>
 </ul>
-
-<p>V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem.</p>
 
 
 <div class="side">
 <h3>Unix a procesy</h3>
 
-<p>V operačních systémech založených na Unixu se nové procesy vytvářejí pomocí kernelových volání <code>fork()</code> a <code>exec()</code>.</p>
+<p>V operačních systémech založených na Unixu se programy spouštějí pomocí kernelových volání <code>fork()</code> a <code>exec()</code>.</p>
 
-<p>Úkolem <code>fork()</code> je naklonovat současný proces do nového, který bude až na jedno číslo identický. Tímto číslem, je návratová hodnota funkce <code>fork()</code>. Rodičovský proces v ní obdrží identifikátor potomka a potomek nulu. Procesy se tak dozví, kým jsou, a v kódu se mohou dále rozhodnout, jaké operace budou vykonávat.</p>
+<p>Úkolem <code>fork()</code> je naklonovat současný proces do nového. Ten bude až na jedno číslo identický, jedná se o návratovou hodnotu funkce <code>fork()</code>. Rodičovský proces v ní obdrží identifikátor potomka a potomek nulu. Procesy se tak dozví, kým jsou, a v kódu se mohou dále rozhodnout, jaké operace budou vykonávat.</p>
 
-<p>Volání <code>exec()</code> umožňuje nahradit současný kontext procesu nějakým jiným. Z kopie předchozího procesu se tak stane úplně jiná aplikace.</p>
+<p>Volání <code>exec()</code> umožňuje nahradit současný kontext procesu něčím jiným. Z kopie předchozího procesu se tak stane úplně jiná aplikace.</p>
 
 <pre>
 <span style='color:#898887;'>// gcc -Wall -o forkexec forkexec.c</span>
@@ -191,7 +185,7 @@ stop on runlevel [S016]
   } <b>else</b> <b>if</b> (pid == <span style='color:#b08000;'>0</span>) {
     printf(<span style='color:#bf0303;'>&quot;Child: pid %d</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>, getpid());
     execl(<span style='color:#bf0303;'>&quot;/bin/echo&quot;</span>, <span style='color:#bf0303;'>&quot;/bin/echo&quot;</span>,
-          <span style='color:#bf0303;'>&quot;Echo: Hello, world!&quot;</span>, NULL);
+          <span style='color:#bf0303;'>&quot;Child: Hello, world!&quot;</span>, NULL);
     <b>return</b> <span style='color:#b08000;'>42</span>; <span style='color:#898887;'>// Never executed</span>
   } <b>else</b> {
     printf(<span style='color:#bf0303;'>&quot;Parent: pid %d, child %d</span><span style='color:#924c9d;'>\n</span><span style='color:#bf0303;'>&quot;</span>,
@@ -208,21 +202,21 @@ stop on runlevel [S016]
 ./forkexec
 Parent: pid 9574, child 9575
 Child: pid 9575
-Echo: Hello, world!
+Child: Hello, world!
 Parent: child exited 0
 </pre>
 
-<p><code>fork()</code> a <code>exec()</code> se nemusí používat pouze společně. Pokud by se zavolal pouze <code>exec()</code>, nedošlo by k naklonování procesu a spuštěná aplikace by se pouze nahradila nějakou jinou. Přesně toho chceme dosáhnout v tomto článku.</p>
+<p>Procesy se v systému označují unikátním identifikátorem PID (Process ID). Platné hodnoty začínají číslem 1 a končí konstantou definovanou v <code>/proc/sys/kernel/pid_max</code>, která má typicky hodnotu 32768 popř. 4194303. Procesy se organizují do stromové struktury, prvním spuštěným je tzv. <code>init</code> s PID 1 (System V init, Upstart, SystemD a další) a má speciální povinnosti.</p>
 
-<p>V případě samostatného volání <code>fork()</code> by se v potomku nenahradil současný kontext za jiný a v systému by defakto běžely dvě kopie původního procesu. Toho se využívá například ve webových serverech, kdy nginx nebo Apache vytváří skupinu tzv. worker procesů, kterým rodič přeposílá práci.</p>
+<p>Volání <code>fork()</code> a <code>exec()</code> se nemusí používat pouze společně. Pokud by se zavolal pouze <code>exec()</code>, nedošlo by k naklonování procesu a spuštěná aplikace by se pouze nahradila nějakou jinou. Přesně toho chceme dosáhnout při spouštění Kafky.</p>
 
-<p>Procesy se v systému označují unikátním identifikátorem PID (Process ID). Platné hodnoty začínají číslem 1 a končí konstantou definovanou v <code>/proc/sys/kernel/pid_max</code>, která má typicky hodnotu 32768 popř. 4194303. Procesy se organizují do stromové struktury, prvním spuštěným je <code>init</code> s PID 1 (System V init, Upstart, SystemD a další) a má speciální povinnosti.</p>
+<p>V případě samostatného volání <code>fork()</code> by se v potomku nenahradil současný kontext za jiný a v systému by defakto běžely dvě kopie původního procesu. Toho se využívá například ve webových serverech, kdy rodičovský proces vytváří skupinu tzv. worker procesů, kterým přeposílá práci.</p>
 </div>
 
 
 <h2>Do hlubin /bin/su</h2>
 
-<p>Zkusme v rychlosti analyzovat chování /bin/su. V prvním terminálu pod rootem spustíme příkaz obdobný Upstart konfiguraci. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, proces JVM se při startu Kafky spouští úplně stejně (viz kód <code>kafka-server-start.sh</code>, resp. <code>kafka-run-class.sh</code>).</p>
+<p>Zkusme si v rychlosti analyzovat chování /bin/su a skriptů, které spouští Kafku. V prvním terminálu pod rootem spustíme příkaz obdobný Upstart konfiguraci. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, proces JVM se při startu Kafky spouští úplně stejně (viz kód <code>kafka-server-start.sh</code>, resp. <code>kafka-run-class.sh</code>).</p>
 
 <pre>
 # Become root
