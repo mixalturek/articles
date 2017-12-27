@@ -195,10 +195,12 @@ Parent: child exited 0
 </div>
 
 
-<h2>su kafka</h2>
+<h2><code>su kafka</code></h2>
 
-<p>Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor s nastaveným <code>sticky bitem</code> a bývá často skloňován snad v každé knize o bezpečnosti v unixových prostředích. V tomto případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru. Používá se přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem. Pojďme v <code>/bin/su</code> zkusit najít odpověď na naši otázku.</p>
+<p>Kdo je tedy vrah? Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor s nastaveným <code>sticky bitem</code> a bývá často skloňován v knihách o bezpečnosti v unixových prostředích. V našem případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru, ale přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem. Pojďme zkusit najít v <code>/bin/su</code> odpověď na naši otázku.</p>
 
+
+<div class="side">
 <p>Anketa: Opravdu zabíjí <code>/bin/su</code> proces potomka signálem <code>SIGKILL</code>?</p>
 
 <ul>
@@ -208,10 +210,13 @@ Parent: child exited 0
 <li>Nevím.</li>
 </ul>
 
+<p>Správnou odpověď naleznete dále v textu a nejspíš vás překvapí...</p>
+</div>
 
-<h2>Do hlubin /bin/su</h2>
 
-<p>Zkusme si v rychlosti analyzovat chování /bin/su a skriptů, které spouští Kafku. V prvním terminálu pod rootem spustíme příkaz obdobný Upstart konfiguraci. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, proces JVM se při startu Kafky spouští úplně stejně (viz kód <code>kafka-server-start.sh</code>, resp. <code>kafka-run-class.sh</code>).</p>
+<h2>Do hlubin <code>/bin/su</code></h2>
+
+<p>Zkusme si v rychlosti analyzovat chování <code>/bin/su</code> a skriptů, které startují Kafku. Místo Kafky pro jednoduchost použijeme příkaz <code>sleep</code>, který čeká daný počet sekund a pak se sám ukončí. V prvním terminálu pod <code>root</code>em spustíme příkaz obdobný Upstart konfiguraci, přepínáme se na uživatele <code>nobody</code>. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, JVM se při startu Kafky spouští úplně stejně (viz kód skriptů <code>kafka-server-start.sh</code> a <code>kafka-run-class.sh</code>).</p>
 
 <pre>
 # Become root
@@ -221,7 +226,7 @@ su -
 exec /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60'
 </pre>
 
-<p>V druhém terminálu se podíváme na strom procesů. Oba příkazy /bin/su se zachovaly, <code>exec</code> nahradil pouze shell v potomcích. Tímto pokusem jsme zjistili, že Upstart posílá SIGTERM /bin/su a ne JVM procesu, ve kterém běží Kafka.</p>
+<p>V druhém terminálu se podíváme na strom procesů. Oba příkazy <code>/bin/su</code> se zachovaly, <code>exec</code> nahradil pouze proces shellu. Tímto pokusem jsme zjistili, že Upstart posílá ukončovací signály <code>/bin/su</code> a ne JVM procesu, ve kterém běží Kafka, protože spravuje pouze přímé potomky. Našli jsme první, méně významný, bug. Je jisté, že <code>/bin/su</code> nikdy nepřepošle <code>SIGKILL</code>, který není mapovatelný a Kafka může při ukončování zůstat "viset".</p>
 
 <pre>
 pstree | less
@@ -235,7 +240,7 @@ init-+
      |-xterm---bash---su---su---sleep
 </pre>
 
-<p>Pokus číslo dva a <code>strace</code>. Jaká volání systému vykoná /bin/su po příchozím SIGTERMu?</p>
+<p>Pokus číslo dva a <code>strace</code>. Jaká volání systému vykoná <code>/bin/su</code> po příchozím <code>SIGTERM</code>u?</p>
 
 <pre>
 strace /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60' 2> strace_su.log
@@ -243,7 +248,7 @@ strace /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60' 2> strace_su.log
 kill -s TERM 11827
 </pre>
 
-<p>Hledáme klíčová slova <code>kill</code>, <code>SIGTERM</code> a <code>SIGKILL</code>. Podle výstupu /bin/su nejdříve pošle potomkovi <code>SIGTERM</code>, poté počká 2 sekundy a aby mělo jistotu, zabije ho pomocí <code>SIGKILL</code>. <strong>Jenom dvě sekundy?</strong> Máme odpověď, ale proč jenom dvě sekundy?</p>
+<p>Hledáme klíčová slova <code>kill</code>, <code>SIGTERM</code> a <code>SIGKILL</code>. Podle výstupu <code>/bin/su</code> nejdříve pošle potomkovi <code>SIGTERM</code>, poté počká 2 sekundy a aby mělo jistotu, zabije ho pomocí <code>SIGKILL</code>. <strong>Jenom dvě sekundy?</strong> Máme odpověď, ale proč jenom dvě sekundy?</p>
 
 <pre>
 ...
@@ -265,9 +270,9 @@ kill(11827, SIGTERM)                    = 0
 </pre>
 
 
-<h2>Zdrojové kódy /bin/su</h2>
+<h2>Zdrojové kódy <code>/bin/su</code></h2>
 
-<p>Najít zdrojové kódy /bin/su není úplně jednoduché, ale jde to zvládnout. Na serverch s Kafkou toho času běží stařičký CentOS 6.</p>
+<p>Najít zdrojové kódy <code>/bin/su</code> není úplně jednoduché, ale jde to zvládnout. Na serverch s Kafkou toho času běží stařičký CentOS 6.</p>
 
 <pre>
 rpm -qf /bin/su
@@ -297,7 +302,7 @@ coreutils-8.4-43.el6.x86_64
 
 <p>Pravděpodobně se jedná o backport nějaké důležité funkcionality z upstream verze do starého systému. Autorem patche je pravděpodobně někdo z RedHatu.</p>
 
-<p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze /bin/su</a>.</p>
+<p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze <code>/bin/su</code></a>.</p>
 
 <pre>
 commit 8171142ab66e94a409224547b33381259a0c3f72
@@ -307,7 +312,7 @@ Date:   Tue Aug 17 13:21:44 2010 +0200
     pam support for su
 </pre>
 
-<p>Tento bug nebo možná pouze feature jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to nevypadá, že by změna v kódu byla někdy aplikována. Ačkoli změna proti současnému stavu dává smysl, protože by se /bin/su chovalo více konzistentně, nemáme motivaci se ji pokusit protlačit.</p>
+<p>Tento bug nebo možná pouze feature jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to nevypadá, že by změna v kódu byla někdy aplikována. Ačkoli změna proti současnému stavu dává smysl, protože by se <code>/bin/su</code> chovalo více konzistentně, nemáme motivaci se ji pokusit protlačit.</p>
 
 
 <h2>Není su jako su</h2>
@@ -344,7 +349,7 @@ exit_group(143)                         = ?
 +++ exited with 143 +++
 </pre>
 
-<p>Může za to stáří systému? CentOS 6 je výrazně starší než současný a taktéž hodně starý Debian Stable/Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi /bin/su a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
+<p>Může za to stáří systému? CentOS 6 je výrazně starší než současný a taktéž hodně starý Debian Stable/Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi <code>/bin/su</code> a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
 
 <p>Pojďme si opět projít zdrojové kódy.</p>
 
@@ -353,23 +358,23 @@ dpkg -S /bin/su
 login: /bin/su
 </pre>
 
-<p>Balík má jiné jméno - <a href="https://packages.debian.org/jessie/login">login</a> a zdrojový balík je také jiný - <a href="https://packages.debian.org/jessie/login">shadow</a>. Chyba v matrixu? Proč taková změna? Tentokrát nebudu napínat, <strong>/bin/su na Debianu je úplně jiná aplikace než /bin/su na CentOSu!</strong> Cože?! :-O</p>
+<p>Balík má jiné jméno - <a href="https://packages.debian.org/jessie/login">login</a> a zdrojový balík je také jiný - <a href="https://packages.debian.org/jessie/login">shadow</a>. Chyba v matrixu? Proč taková změna? Tentokrát nebudu napínat, <strong><code>/bin/su</code> na Debianu je úplně jiná aplikace než <code>/bin/su</code> na CentOSu!</strong> Cože?! :-O</p>
 
 <p>Už je všechno v pořádku? Vstřebali jste to? Dobře, tak zavřete pusu. Debianí projekt sídlí na <a href="http://pkg-shadow.alioth.debian.org/">pkg-shadow.alioth.debian.org</a> a moc toho o sobě neříká. Vývojáři Debianu se možná rozhodli pro vlastní implementaci tohoto důležitého subsystému, aby ho měli plně pod kontrolou. Ale to jenom hádáme.</p>
 
 <p>Je moc hezké vidět principy objektového programování - více implementací interface s do detailů splněnými kontrakty - i na úrovni nejzákladnějších unixových utilit. Programátora zkrátka něco takového zahřeje na srdci ;-)</p>
 
-<p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v /bin/su, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem náhoda.</p>
+<p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v <code>/bin/su</code>, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem náhoda.</p>
 
 
 <h2>Jak z toho ven?</h2>
 
-<p>Vraťme se zpět k našemu problému a především k možnostem jeho řešení. Je jasné, že patchovat a provozovat vlastní verzi /bin/su není něco, do čeho by se nám zrovna chtělo. Nicméně použití tohoto nástroje byla čistě naše volba a nikdo nás do něho nenutí.</p>
+<p>Vraťme se zpět k našemu problému a především k možnostem jeho řešení. Je jasné, že patchovat a provozovat vlastní verzi <code>/bin/su</code> není něco, do čeho by se nám zrovna chtělo. Nicméně použití tohoto nástroje byla čistě naše volba a nikdo nás do něho nenutí.</p>
 
 
 <h3>su, sudo</h3>
 
-<p>Co je vlastně hlavním nedostatkem /bin/su (v této situaci, ne obecně)? Především to, že s ním vzniká hned několik podprocesů a Upstart operuje s PID předka místo potomka. Na začátku se spouští /bin/su, /bin/su spouští login shell a shell spouští příkaz uvedený v parametrech. A při ukončování procesu Upstart posílá SIGTERM /bin/su a ne Kafce. Tento řetěz několika fork-exec operací je mnohem složitější, než by mohl být. Místo něj by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který přepíše současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj vůbec navrženy, a je tedy zbytečné je dále uvažovat.</p>
+<p>Co je vlastně hlavním nedostatkem <code>/bin/su</code> (v této situaci, ne obecně)? Především to, že s ním vzniká hned několik podprocesů a Upstart operuje s PID předka místo potomka. Na začátku se spouští <code>/bin/su</code>, <code>/bin/su</code> spouští login shell a shell spouští příkaz uvedený v parametrech. A při ukončování procesu Upstart posílá <code>SIGTERM</code> <code>/bin/su</code> a ne Kafce. Tento řetěz několika fork-exec operací je mnohem složitější, než by mohl být. Místo něj by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který přepíše současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj vůbec navrženy, a je tedy zbytečné je dále uvažovat.</p>
 
 
 <h3>Upstart</h3>
@@ -378,7 +383,7 @@ login: /bin/su
 
 <p>Dokumentace Upstartu popisuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit job pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou v Debianu a Ubuntu, která "jednoduše spustí (exec) daný příkaz poté, co změní UID/GID", což je přesně to, k čemu jsme došli sami.  U su a sudo uvádí další dosud neuvažovanou nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>, což je při obyčejném spouštění aplikace spíše nežádoucí chování. Téměř na konci této sekce dokumentace je mezi příklady se su a sudo jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
 
-<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně". Následuje několik odstavců o tom, jak se chovají různé typy aplikací, některé neforkují vůbec, jiné forkují jednou a ještě jiné dvakrát a co z toho plyne pro Upstart, který musí být schopen referencovat a spravovat správný process. Kdybychom si tuto část přečetli už kdysi, ušetřili bychom si všechny budoucí "zážitky" a problémy. S původní /bin/su variantou v konfiguračním souboru by bylo správné přidat dodatečný řádek <code>expect fork</code>, který by Upstartu oznámil, že má čekat právě jeden fork spouštěné aplikace. Tudíž by nespravoval /bin/su, ale Javu/Kafku. Tuto možnost jsme už ovšem nezkoušeli, protože jsme se rozhodli jít původně naznačenou cestou.</p>
+<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně". Následuje několik odstavců o tom, jak se chovají různé typy aplikací, některé neforkují vůbec, jiné forkují jednou a ještě jiné dvakrát a co z toho plyne pro Upstart, který musí být schopen referencovat a spravovat správný process. Kdybychom si tuto část přečetli už kdysi, ušetřili bychom si všechny budoucí "zážitky" a problémy. S původní <code>/bin/su</code> variantou v konfiguračním souboru by bylo správné přidat dodatečný řádek <code>expect fork</code>, který by Upstartu oznámil, že má čekat právě jeden fork spouštěné aplikace. Tudíž by nespravoval <code>/bin/su</code>, ale Javu/Kafku. Tuto možnost jsme už ovšem nezkoušeli, protože jsme se rozhodli jít původně naznačenou cestou.</p>
 
 
 <h3>Přepnutí uživatele</h3>
@@ -386,13 +391,13 @@ login: /bin/su
 <p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je zajímavé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj, a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tata situaci se může porovnat například se su a sudo - dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude.</p>
 
 <ul>
-    <li><code>start-stop-daemon</code> - pouze Debian a deriváty</li>
-    <li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> - různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
-    <li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> - přepis Debianího toolu z Perlu do C</li>
-    <li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> - součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v /bin/su</a>, ale není ani v CentOSu ani v Debianu</li>
-    <li><a href="https://github.com/tianon/gosu">gosu</a> - používaný v kontejnerech a Docker světě</li>
-    <li>Python: <code><a href="https://docs.python.org/3/library/os.html">import os</a> ; os.setuid(...) ; os.exec*(...)</code>. Při použití pozor na <a href="https://www.dwheeler.com/secure-programs/Secure-Programs-HOWTO/environment-variables.html">reset prostředí</a>!</li>
-    <li>A spousty dalších možností...</li>
+<li><code>start-stop-daemon</code> - pouze Debian a deriváty</li>
+<li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> - různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
+<li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> - přepis Debianího toolu z Perlu do C</li>
+<li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> - součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v <code>/bin/su</code></a>, ale není ani v CentOSu ani v Debianu</li>
+<li><a href="https://github.com/tianon/gosu">gosu</a> - používaný v kontejnerech a Docker světě</li>
+<li>Python: <code><a href="https://docs.python.org/3/library/os.html">import os</a> ; os.setuid(...) ; os.exec*(...)</code>. Při použití pozor na <a href="https://www.dwheeler.com/secure-programs/Secure-Programs-HOWTO/environment-variables.html">reset prostředí</a>!</li>
+<li>A spousty dalších možností...</li>
 </ul>
 
 <p>Shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
