@@ -216,7 +216,7 @@ Parent: child exited 0
 
 <h2>Do hlubin <code>/bin/su</code></h2>
 
-<p>Zkusme si v rychlosti analyzovat chování <code>/bin/su</code> a skriptů, které startují Kafku. Místo Kafky pro jednoduchost použijeme příkaz <code>sleep</code>, který čeká daný počet sekund a pak se sám ukončí. V prvním terminálu pod <code>root</code>em spustíme příkaz obdobný Upstart konfiguraci, přepínáme se na uživatele <code>nobody</code>. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, JVM se při startu Kafky spouští úplně stejně (viz kód skriptů <code>kafka-server-start.sh</code> a <code>kafka-run-class.sh</code>).</p>
+<p>Zkusme si v rychlosti analyzovat chování <code>/bin/su</code> a skriptů, které startují Kafku. <code>/bin/su</code> podle dokumentace nejdříve spouští shell a až ten následně aplikaci. Místo Kafky pro jednoduchost použijeme příkaz <code>sleep</code>, který čeká daný počet sekund a pak se sám ukončí. V prvním terminálu pod <code>root</code>em spustíme příkaz obdobný Upstart konfiguraci, přepínáme se na uživatele <code>nobody</code>. Příkaz <code>exec</code> se před <code>sleep</code> nachází úmyslně, JVM se při startu Kafky spouští úplně stejně (viz kód skriptů <code>kafka-server-start.sh</code> a <code>kafka-run-class.sh</code>).</p>
 
 <pre>
 # Become root
@@ -226,7 +226,7 @@ su -
 exec /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60'
 </pre>
 
-<p>V druhém terminálu se podíváme na strom procesů. Oba příkazy <code>/bin/su</code> se zachovaly, <code>exec</code> nahradil pouze proces shellu. Tímto pokusem jsme zjistili, že Upstart posílá ukončovací signály <code>/bin/su</code> a ne JVM procesu, ve kterém běží Kafka, protože spravuje pouze přímé potomky. Našli jsme první, méně významný, bug. Je jisté, že <code>/bin/su</code> nikdy nepřepošle <code>SIGKILL</code>, který není mapovatelný a Kafka může při ukončování zůstat "viset".</p>
+<p>V druhém terminálu se podíváme na strom procesů. Oba příkazy <code>/bin/su</code> se podle očekávání zachovaly, <code>exec</code> nahradil pouze proces shellu. Tímto pokusem jsme zjistili, že Upstart posílá ukončovací signály <code>/bin/su</code> a ne JVM, ve kterém běží Kafka, protože vidí a spravuje pouze přímé potomky. Našli jsme první, méně významný, bug. Je jisté, že <code>/bin/su</code> nikdy nepřepošle <code>SIGKILL</code>, který není mapovatelný, a Kafka může při ukončování zůstat "viset" nedefinovaně dlouho.</p>
 
 <pre>
 pstree | less
@@ -248,7 +248,7 @@ strace /bin/su -s /bin/sh - nobody -c 'exec /bin/sleep 60' 2> strace_su.log
 kill -s TERM 11827
 </pre>
 
-<p>Hledáme klíčová slova <code>kill</code>, <code>SIGTERM</code> a <code>SIGKILL</code>. Podle výstupu <code>/bin/su</code> nejdříve pošle potomkovi <code>SIGTERM</code>, poté počká 2 sekundy a aby mělo jistotu, zabije ho pomocí <code>SIGKILL</code>. <strong>Jenom dvě sekundy?</strong> Máme odpověď, ale proč jenom dvě sekundy?</p>
+<p>V logu hledáme klíčová slova <code>kill</code>, <code>SIGTERM</code> a <code>SIGKILL</code>, které nás nejvíce zajímají. <code>/bin/su</code> nejdříve pošle potomkovi <code>SIGTERM</code>, poté počká 2 sekundy a aby mělo jistotu, zabije ho ještě pomocí <code>SIGKILL</code>. V rukách konečně máme jednoznačný důkaz, že <code>/bin/su</code> posílá i <code>SIGKILL</code>. Koruptované indexy se všemi dalšími potížemi jsou konečně vysvětleny! Nicméně se objevila další důležitá otázka: <strong>Kde se vzaly ty dvě sekundy</strong>? Tohle nemá Kafka šanci stihnout.</p>
 
 <pre>
 ...
@@ -269,10 +269,12 @@ kill(11827, SIGTERM)                    = 0
 +++ killed by SIGTERM +++
 </pre>
 
+<p>Pojďme se tedy ponořit ještě o trochu níž.</p>
+
 
 <h2>Zdrojové kódy <code>/bin/su</code></h2>
 
-<p>Najít zdrojové kódy <code>/bin/su</code> není úplně jednoduché, ale jde to zvládnout. Na serverch s Kafkou toho času běží stařičký CentOS 6.</p>
+<p>Najít zdrojové kódy <code>/bin/su</code> není úplně jednoduché, ale jde to zvládnout. Na našich serverech s Kafkou toho času běží stařičký CentOS 6.</p>
 
 <pre>
 rpm -qf /bin/su
@@ -300,7 +302,7 @@ coreutils-8.4-43.el6.x86_64
 +  }
 </pre>
 
-<p>Pravděpodobně se jedná o backport nějaké důležité funkcionality z upstream verze do starého systému. Autorem patche je pravděpodobně někdo z RedHatu.</p>
+<p>Pravděpodobně se jedná o backport nějaké důležité funkcionality z upstreamu do starší verze, autorem patche je pravděpodobně někdo z RedHatu.</p>
 
 <p>Výše uvedený <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a> uvádí jako zdroj <a href="http://www.gnu.org/software/coreutils/coreutils.html">gnu.org/coreutils</a>, nicméně projekt nebo jeho část se někdy v minulosti přesunul na <a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/about/">kernel.org/util-linux</a>. S <code>git annotate</code> se dá v dávné historii dohledat <a href="https://github.com/karelzak/util-linux/commit/8171142ab66e94a409224547b33381259a0c3f72">původní zdrojový commit</a>, bohužel jeho popis neobsahuje moc relevantních informací. Pro zájemce uvádím i odkaz na <a href="https://github.com/karelzak/util-linux/blob/master/login-utils/su-common.c">zdrojový kód nejnovější verze <code>/bin/su</code></a>.</p>
 
@@ -312,12 +314,12 @@ Date:   Tue Aug 17 13:21:44 2010 +0200
     pam support for su
 </pre>
 
-<p>Tento bug nebo možná pouze feature jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to nevypadá, že by změna v kódu byla někdy aplikována. Ačkoli změna proti současnému stavu dává smysl, protože by se <code>/bin/su</code> chovalo více konzistentně, nemáme motivaci se ji pokusit protlačit.</p>
+<p>Tento bug (nebo možná pouze feature) jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to ale nevypadá, že by naše úprava byla někdy aplikována. Ačkoli změna oproti současnému stavu dává smysl, protože by se <code>/bin/su</code> chovalo konzistentněji, nemáme motivaci se ji pokusit protlačit.</p>
 
 
 <h2>Není su jako su</h2>
 
-<p>Nyní v článku trochu odbočíme a budeme se věnovat jednomu překvapivému zjištění. Pokud byste si zkusili výše uvedené příklady na Debianu, nebudou vám vůbec fungovat. Výstup <code>strace</code> od pohledu vypadá úplně jinak a hlavně neobsahuje žádný <code>SIGKILL</code>.</p>
+<p>Nyní v článku trochu odbočíme a budeme se věnovat jednomu překvapivému zjištění. Pokud byste si zkusili výše uvedené příklady na Debianu, budou se chovat odlišně. Výstup <code>strace</code> od pohledu vypadá úplně jinak a hlavně neobsahuje žádný <code>SIGKILL</code>.</p>
 
 <pre>
 ...
@@ -349,22 +351,20 @@ exit_group(143)                         = ?
 +++ exited with 143 +++
 </pre>
 
-<p>Může za to stáří systému? CentOS 6 je výrazně starší než současný a taktéž hodně starý Debian Stable/Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi <code>/bin/su</code> a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
+<p>Může za to stáří systému? CentOS 6 je výrazně starší než taktéž hodně starý Debian Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi <code>/bin/su</code> a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
 
-<p>Pojďme si opět projít zdrojové kódy.</p>
+<p>Opověď opět určitě nalezneme ve zdrojových kódech.</p>
 
 <pre>
 dpkg -S /bin/su
 login: /bin/su
 </pre>
 
-<p>Balík má jiné jméno - <a href="https://packages.debian.org/jessie/login">login</a> a zdrojový balík je také jiný - <a href="https://packages.debian.org/jessie/login">shadow</a>. Chyba v matrixu? Proč taková změna? Tentokrát nebudu napínat, <strong><code>/bin/su</code> na Debianu je úplně jiná aplikace než <code>/bin/su</code> na CentOSu!</strong> Cože?! :-O</p>
+<p>Balík má jiné jméno (<a href="https://packages.debian.org/jessie/login">login</a>) a zdrojový balík je také jiný (<a href="https://packages.debian.org/jessie/login">shadow</a>). Chyba v matrixu? Proč taková výrazná změna? Tentokrát nebudu napínat, <strong><code>/bin/su</code> je na Debianu úplně jiná aplikace než <code>/bin/su</code> na CentOSu!</strong> Cože?!</p>
 
-<p>Už je všechno v pořádku? Vstřebali jste to? Dobře, tak zavřete pusu. Debianí projekt sídlí na <a href="http://pkg-shadow.alioth.debian.org/">pkg-shadow.alioth.debian.org</a> a moc toho o sobě neříká. Vývojáři Debianu se možná rozhodli pro vlastní implementaci tohoto důležitého subsystému, aby ho měli plně pod kontrolou. Ale to jenom hádáme.</p>
+<p>Vstřebali jste tu informaci? Dobře, tak zavřete pusu. Debianí projekt sídlí na <a href="http://pkg-shadow.alioth.debian.org/">pkg-shadow.alioth.debian.org</a> a moc toho o sobě neříká. Vývojáři Debianu se možná rozhodli pro vlastní implementaci tohoto důležitého subsystému, aby ho měli plně pod kontrolou. Ale to jenom hádáme.</p>
 
-<p>Je moc hezké vidět principy objektového programování - více implementací interface s do detailů splněnými kontrakty - i na úrovni nejzákladnějších unixových utilit. Programátora zkrátka něco takového zahřeje na srdci ;-)</p>
-
-<p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v <code>/bin/su</code>, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem náhoda.</p>
+    <p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v <code>/bin/su</code>, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem <em>náhoda</em>.</p>
 
 
 <h2>Jak z toho ven?</h2>
