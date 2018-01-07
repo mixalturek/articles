@@ -210,7 +210,7 @@ Parent: child exited 0
 <li>Nevím.</li>
 </ul>
 
-<p>Správnou odpověď naleznete dále v textu a nejspíš vás překvapí...</p>
+<p>Správnou odpověď naleznete dále v textu a - ať už jste hlasovali jakkoli - nejspíš vás překvapí...</p>
 </div>
 
 
@@ -372,7 +372,7 @@ login: /bin/su
 
 <h3>su, sudo</h3>
 
-<p>Co je vlastně v této situaci hlavním nedostatkem <code>/bin/su</code>? Především to, že s ním vzniká hned několik podprocesů a že Upstart operuje s PID předka místo potomka. Nejdříve se spouští <code>/bin/su</code>, <code>/bin/su</code> spouští login shell a shell spouští požadovaný příkaz. Při ukončování procesu Upstart posílá <code>SIGTERM</code> <code>/bin/su</code> a ne Kafce. Tato sekvence několika fork-exec operací je výrazně složitější, než by mohla být. Místo ní by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který by přepsal současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj navrženy, a je tedy zbytečné je dále uvažovat.</p>
+<p>Co je vlastně v této situaci hlavním nedostatkem <code>/bin/su</code>? Především to, že s ním vzniká hned několik podprocesů a že Upstart operuje s PID předka místo potomka. Nejdříve se spouští <code>/bin/su</code>, <code>/bin/su</code> spouští shell a shell spouští požadovaný příkaz. Při ukončování procesu Upstart posílá <code>SIGTERM</code> <code>/bin/su</code> a ne Kafce. Tato sekvence několika fork-exec operací je výrazně složitější, než by mohla být. Místo ní by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který by přepsal současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj navrženy, a je tedy zbytečné je dále uvažovat.</p>
 
 
 <h3>Upstart</h3>
@@ -399,6 +399,15 @@ login: /bin/su
 </ul>
 
 <p>Aby jich nebylo málo, shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
+
+
+<h2>Závěrem</h2>
+
+<p>Nebylo to nijak jednoduché, ale chybu s problematickými restarty Kafky jsme nakonec úspěšně vyřešili. Při hledání jsme se ponořili z vícedatacentrového cloudu s několika distribuovanými aplikacemi o mnoha instancích na úroveň operačního systému, dokumentace Kafky, jejích startovacích skriptů, JVM, systémových init skriptů a dále až k teoretickému chování unixových procesů při jejich spouštění.</p>
+
+<p>Jádro celého problému jsme nakonec odhalili až ve zdrojových kódech příkazu <code>/bin/su</code>, kam nás navedl <code>strace</code> výpis systémových volání. <code>/bin/su</code> obsahuje nedokumentovanou a velice nečekanou vlastnost, dvě sekundy od <code>SIGTERM</code> požadavku na ukončení posílá procesu potomka signál <code>SIGKILL</code> a tím mu bere jakoukoli šanci na korektní ukončení. Nicméně toto tvrzení neplatí ve všech Linuxových distribucích! Další překvapení přišlo ve chvíli, kdy jsme zjistili, že <code>/bin/su</code> na CentOSu a <code>/bin/su</code> na Debianu jsou dvě různé, naprosto nezávislé aplikace s různými zdrojovými kódy.</p>
+
+<p>Dále explicitně podotýkáme, že ani při hledání chyby a ani při psaní článku nebyly prováděny žádné pokusy na kafkách či jiných zvířatech spojené s jejich případným týráním.</p>
 
 </div>
 </body>
