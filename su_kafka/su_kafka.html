@@ -24,7 +24,7 @@
 
 <p>Tento příběh začal, jako většina podobných investigací, příchozími alerty o chybách na produkci. Pravidelně spouštěné integrační testy začaly po aktualizaci a plánovaném restartu jednoho z nodů <a href="http://kafka.apache.org/">Apache Kafka</a> clusteru hlásit duplikace v konzumovaných zprávách.</p>
 
-<p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi desítkami až stovkami duplicit denně nebo tisíci za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stějně někdo brzy všimnul.</p>
+<p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi desítkami až stovkami duplicit denně nebo tisíci za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stejně někdo brzy všimnul.</p>
 
 <p>Začátek všech alertů celkem jasně korespondoval s aktualizací první instance Kafky a následným restartem. Naše dosavadní zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, právě o tom je tento článek. My už je snad budeme mít v budoucnu také - <em>zkrátka chyba byla u nás a Kafka za nic nemohla</em>.</p>
 
@@ -41,7 +41,7 @@
 
 <p>Události z Kafky vyčítají <em>Input Filtry</em>, jejichž úkolem je konverze starších formátů na nový, čištění dat, opravy chyb způsobených bugy v historických verzích klientů, obohacení událostí o GeoIP lokace a podobně. Data se zapisují zpět do té samé DC Kafky, ale do topiků s jinými jmény.</p>
 
-<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standartního Mirror maker toolu do tzv. master Kafky, odkud je dále vyčítají finální konzumenti do <a href="http://hadoop.apache.org/">Hadoopu/HDFS</a>, vybrané topiky tečou do <a href="https://www.elastic.co/">Elasticsearche</a>, malá frakce se sampluje na stage a dev prostředí, popř. nad streamem běží nejrůznější realtime analýzy. Kafka otevírá spoustu možností.</p>
+<p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standardního Mirror maker toolu do tzv. master Kafky, odkud je dále vyčítají finální konzumenti do <a href="http://hadoop.apache.org/">Hadoopu/HDFS</a>, vybrané topiky tečou do <a href="https://www.elastic.co/">Elasticsearche</a>, malá frakce se sampluje na stage a dev prostředí, popř. nad streamem běží nejrůznější realtime analýzy. Kafka otevírá spoustu možností.</p>
 
 <p class="img"><img src="img/kafka_pipeline.png" /></p>
 
@@ -57,16 +57,16 @@
 
 <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je zpracovávají. Producenti a konzumenti jsou naprosto nezávislé systémy a mají plně oddělený životní cyklus, spojuje je pouze formát přenášených zpráv.</p>
 
-<p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>. Narozdíl od nich garantuje pořadí doručení událostí - v jádru své architektury obsahuje datovou strukturu <a href="https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying">log</a>. Díky tomuto napohled malému rozdílu může být jednou z jejích dalších aplikací i <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a>, kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají pouze formu <em>materialized view</em> a dají se kdykoli přepočítat.</p>
+<p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>. Na rozdíl od nich garantuje pořadí doručení událostí - v jádru své architektury obsahuje datovou strukturu <a href="https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying">log</a>. Díky tomuto napohled malému rozdílu může být jednou z jejích dalších aplikací i <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a>, kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají pouze formu <em>materialized view</em> a dají se kdykoli přepočítat.</p>
 </div>
 
 <h2>Duplicity, duplicity, duplicity</h2>
 
 <p>Integrační testy, o nichž byla v úvodu řeč, simulují chování reálných klientů na obou stranách pipeline. Generují a zapisují události do Receiverů v jednotlivých datacentrech, následně je vyčítají z master Kafky a porovnávají přijatá data s očekávanými transformacemi. Každá z testovacích zpráv obsahuje unikátní <code>UUID.randomUUID()</code> pro párování vstupu a výstupu, bez toho by nemohly fungovat. Integrační testy si ale také ukládají množinu již přijatých UUID. Pokud se některé z nich na výstupu systému objeví více než jednou, je to jasná známka duplikace.</p>
 
-<p>Jelikož počátek duplikací časově korespondoval s restartem prvního Kafka brokeru ve frankfurtském datacentru, dá se předpokládat, že je na vině tato DC Kafka nebo některý ze systémů, který s ní přímo komunikuje, tj. Receiver (producent), Input Filtry (konzument, producent), ostatní Kafka brokeři ve frankfurtu (repliky) nebo Mirror maker (konzument).</p>
+<p>Jelikož počátek duplikací časově korespondoval s restartem prvního Kafka brokeru ve frankfurtském datacentru, dá se předpokládat, že je na vině tato DC Kafka nebo některý ze systémů, který s ní přímo komunikuje, tj. Receiver (producent), Input Filtry (konzument, producent), ostatní Kafka brokeři ve Frankfurtu (repliky) nebo Mirror maker (konzument).</p>
 
-<p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurkt bylo vše ihned jasné. Po restartu se datový přenos vrátil zpět na původní hodnoty a integrační testy znovu samým štěstím zezelenaly.</p>
+<p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurt bylo vše ihned jasné. Po restartu se datový přenos vrátil zpět na původní hodnoty a integrační testy znovu samým štěstím zezelenaly.</p>
 
 <p class="img"><img src="img/duplicates_mirrors_all.png" /></p>
 <p class="img"><img src="img/duplicates_mirrors_fra.png" /></p>
@@ -86,7 +86,7 @@
 
 <ul>
 <li>Kafka po restartu vždy přepočítává spousty koruptovaných indexů. Tato operace občas trvá i <strong>několik hodin</strong> a opravdu bolí. Jeden rolling restart celého clusteru trvá běžně celý den. Update na novou verzi potřebuje v obecném případě dva restarty a clusterů máme několik. Zkrátka obrovské <em>auuu</em>.</li>
-<li>Pokud se Kafka po zastavení ihned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID je v něm stále registrované a je třeba chvíli počkat na timeout. Do init skriptu vkládáme při restartu mezi start a stop oprace umělý sleep.</li>
+<li>Pokud se Kafka po zastavení ihned spustí, ZooKeeper ji odmítne, protože si myslí, že stále běží. Broker ID je v něm stále registrované a je třeba chvíli počkat na timeout. Do init skriptu vkládáme při restartu mezi start a stop operace umělý sleep.</li>
 <li>Producentům se v okamžiku restartu nedaří zapisovat do partition, jejichž leader je při rebalancingu migrován na ostatní brokery z ISR (In Sync Replicas). Callback v klientu obdrží místo úspěšného potvrzení výjimku, nakonfigurovaný jeden retry nestačí.</li>
 <li>Na producentech používáme <code>acks = 1</code>, tj. při odesílání dat stačí potvrzení od leadera, aby se považovala za bezpečně uložená. Ve chvíli, kdy leader přestane být dostupný, se tudíž ztrácí zprávy, které se ještě nestihly odeslat replikám. Řádově se jedná o malé desítky až stovky zpráv.</li>
 <li>Konzumenti se občas škaredě zblázní. A když píšu škaredě, myslím tím opravdu <strong>škaredě</strong>. Výše byl popsán problém s duplikacemi, ale už jsme u několika mála partition a skupin konzumentů viděli i ztrátu offsetů, což by nemělo nikdy, ale opravdu nikdy nastat. Podle logů byla tato ztráta pravděpodobně způsobená chvilkovou nedostupností dat, kdy Kafka nejspíše klientovi odpověděla aniž by byla plně inicializovaná. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několika dnů. Od jisté doby už nepoužíváme <code>earliest</code>, ale <code>latest</code> s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat, znovuzpracovávat a řešit, že všechna data máme v HDFS a dalších systémech dvakrát. Samozřejmě záleží na službě a očekáváních.</li>
@@ -351,7 +351,7 @@ exit_group(143)                         = ?
 +++ exited with 143 +++
 </pre>
 
-<p>Může za to stáří systému? CentOS 6 je výrazně starší než taktéž hodně starý Debian Jessie a také jsme si ověřili, že se <code>SIGKILL</code> nachází i v master branchi <code>/bin/su</code>. Dokonce jsme udělali opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno. Opověď opět určitě nalezneme ve zdrojových kódech.</p>
+<p>Může za to stáří systému? CentOS 6 je výrazně starší než taktéž hodně starý Debian Jessie a také jsme si ověřili, že se <code>SIGKILL</code> nachází i v master větvi <code>/bin/su</code>. Dokonce jsme udělali opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno. Odpověď opět určitě nalezneme ve zdrojových kódech.</p>
 
 <pre>
 dpkg -S /bin/su
@@ -398,7 +398,7 @@ login: /bin/su
 <li>A spousty dalších možností...</li>
 </ul>
 
-<p>Aby jich nebylo málo, shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
+<p>Aby jich nebylo málo, shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standardizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
 
 
 <h2>Závěrem</h2>
