@@ -281,7 +281,7 @@ rpm -qf /bin/su
 coreutils-8.4-43.el6.x86_64
 </pre>
 
-<p>Po vyhledání balíku a konkrétní verze dorazíme na <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a>, což sice není autoritativní zdroj, ale pro naše účely postačí. Na stránce je zároveň uveden odkaz na zdrojový balík, ve kterém by se měly nacházet zdrojové kódy. Stáhneme ho a rozbalíme. Po chvíli hledání objevíme soubor <code>coreutils-pam.patch</code> a kód, který odpovídá výstupu <code>strace</code>.</p>
+<p>Po vyhledání balíčku a konkrétní verze dorazíme na <a href="https://rpmfind.net/linux/RPM/centos/6.8/x86_64/Packages/coreutils-8.4-43.el6.x86_64.html">rpmfind.net</a>, což sice není autoritativní zdroj, ale pro naše účely postačí. Na stránce je zároveň uveden odkaz na zdrojový balíček, ve kterém by se měly nacházet zdrojové kódy. Stáhneme ho a rozbalíme. Po chvíli hledání objevíme soubor <code>coreutils-pam.patch</code> a kód, který odpovídá výstupu <code>strace</code>.</p>
 
 <pre>
 +  if (caught) {
@@ -351,47 +351,45 @@ exit_group(143)                         = ?
 +++ exited with 143 +++
 </pre>
 
-<p>Může za to stáří systému? CentOS 6 je výrazně starší než taktéž hodně starý Debian Jessie. Tím to nebude, vždyť jsme si ověřili, že se <code>SIGKILL</code> nachází i v nejnovější verzi <code>/bin/su</code> a dokonce jsme udělali i opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno.</p>
-
-<p>Opověď opět určitě nalezneme ve zdrojových kódech.</p>
+<p>Může za to stáří systému? CentOS 6 je výrazně starší než taktéž hodně starý Debian Jessie a také jsme si ověřili, že se <code>SIGKILL</code> nachází i v master branchi <code>/bin/su</code>. Dokonce jsme udělali opravu, která tuto funkcionalitu odstraňuje. Nebo že by se jednalo o nějaký distribuční patch, který by opravoval právě tuto chybu? Možné je všechno. Opověď opět určitě nalezneme ve zdrojových kódech.</p>
 
 <pre>
 dpkg -S /bin/su
 login: /bin/su
 </pre>
 
-<p>Balík má jiné jméno (<a href="https://packages.debian.org/jessie/login">login</a>) a zdrojový balík je také jiný (<a href="https://packages.debian.org/jessie/login">shadow</a>). Chyba v matrixu? Proč taková výrazná změna? Tentokrát nebudu napínat, <strong><code>/bin/su</code> je na Debianu úplně jiná aplikace než <code>/bin/su</code> na CentOSu!</strong> Cože?!</p>
+<p>Balíček má jiné jméno (<a href="https://packages.debian.org/jessie/login">login</a>) a zdrojový balíček je také jiný (<a href="https://packages.debian.org/jessie/login">shadow</a>). Chyba v matrixu? Proč taková výrazná změna? Tentokrát nebudeme napínat, <strong><code>/bin/su</code> na Debianu je úplně jiná aplikace než <code>/bin/su</code> na CentOSu!</strong></p>
 
 <p>Vstřebali jste tu informaci? Dobře, tak zavřete pusu. Debianí projekt sídlí na <a href="http://pkg-shadow.alioth.debian.org/">pkg-shadow.alioth.debian.org</a> a moc toho o sobě neříká. Vývojáři Debianu se možná rozhodli pro vlastní implementaci tohoto důležitého subsystému, aby ho měli plně pod kontrolou. Ale to jenom hádáme.</p>
 
-    <p>Jak jsme na něco takového přišli? Poté, co David objevil příčinu problému v <code>/bin/su</code>, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem <em>náhoda</em>.</p>
+<p>Jak jsme na něco takového přišli? Poté, co kolega objevil příčinu problému v <code>/bin/su</code>, zkusil jsem při psaní retrospektivy najít poslaný kousek kódu v upstream zdrojových kódech. A protože mám u sebe na počítači Debian, hledal jsem jiným směrem a došel do jiného cíle. Jedním slovem <em>náhoda</em>.</p>
 
 
 <h2>Jak z toho ven?</h2>
 
-<p>Vraťme se zpět k našemu problému a především k možnostem jeho řešení. Je jasné, že patchovat a provozovat vlastní verzi <code>/bin/su</code> není něco, do čeho by se nám zrovna chtělo. Nicméně použití tohoto nástroje byla čistě naše volba a nikdo nás do něho nenutí.</p>
+<p>Vraťme se zpět k našemu problému a především k možnostem jeho řešení. Je jasné, že patchovat a provozovat vlastní verzi <code>/bin/su</code> není něco, do čeho by se komukoli chtělo. Nicméně použití tohoto nástroje byla čistě naše volba a nikdo nás do něho nenutí.</p>
 
 
 <h3>su, sudo</h3>
 
-<p>Co je vlastně hlavním nedostatkem <code>/bin/su</code> (v této situaci, ne obecně)? Především to, že s ním vzniká hned několik podprocesů a Upstart operuje s PID předka místo potomka. Na začátku se spouští <code>/bin/su</code>, <code>/bin/su</code> spouští login shell a shell spouští příkaz uvedený v parametrech. A při ukončování procesu Upstart posílá <code>SIGTERM</code> <code>/bin/su</code> a ne Kafce. Tento řetěz několika fork-exec operací je mnohem složitější, než by mohl být. Místo něj by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který přepíše současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj vůbec navrženy, a je tedy zbytečné je dále uvažovat.</p>
+<p>Co je vlastně v této situaci hlavním nedostatkem <code>/bin/su</code>? Především to, že s ním vzniká hned několik podprocesů a že Upstart operuje s PID předka místo potomka. Nejdříve se spouští <code>/bin/su</code>, <code>/bin/su</code> spouští login shell a shell spouští požadovaný příkaz. Při ukončování procesu Upstart posílá <code>SIGTERM</code> <code>/bin/su</code> a ne Kafce. Tato sekvence několika fork-exec operací je výrazně složitější, než by mohla být. Místo ní by úplně stačilo přepnout efektivní UID z roota na neprivilegovaného uživatele a následně zavolat exec, který by přepsal současný obsah procesu spouštěnou aplikací. Jednoho by mohl napadnout alternativní příkaz sudo, ten se však chová obdobně a výsledná situace by byla naprosto stejná. Ani jeden z nich se pro tento use case naprosto nehodí, nebyly na něj navrženy, a je tedy zbytečné je dále uvažovat.</p>
 
 
 <h3>Upstart</h3>
 
-<p>Úplně nejjednodušší by bylo pomocí direktivy <a href="http://upstart.ubuntu.com/cookbook/#setuid"><code>setuid &lt;username&gt;</code></a> požádat Upstart, aby špinavou práci s přepínáním uživatele odvedl sám a nás tím nezatěžoval. Bohužel tato možnost je dostupná až od verze 1.4, kdežto v CentOSu 6 je dostupná pouze výrazně starší 0.6.5. Update kvůli podobnému problému by byl pouze v říši fantazie.</p>
+<p>Úplně nejjednodušší by bylo pomocí direktivy <a href="http://upstart.ubuntu.com/cookbook/#setuid"><code>setuid &lt;username&gt;</code></a> požádat Upstart, aby špinavou práci s přepínáním uživatele odvedl sám a nás tím vůbec nezatěžoval. Bohužel tato možnost je dostupná až od verze 1.4, kdežto v CentOSu 6 se nachází pouze výrazně starší 0.6.5. Aktualizace kvůli podobné maličkosti tak zůstává pouze v říši fantazie.</p>
 
-<p>Dokumentace Upstartu popisuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit job pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou v Debianu a Ubuntu, která "jednoduše spustí (exec) daný příkaz poté, co změní UID/GID", což je přesně to, k čemu jsme došli sami.  U su a sudo uvádí další dosud neuvažovanou nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>, což je při obyčejném spouštění aplikace spíše nežádoucí chování. Téměř na konci této sekce dokumentace je mezi příklady se su a sudo jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
+<p>Dokumentace Upstartu popisuje, jak správně <a href="http://upstart.ubuntu.com/cookbook/#run-a-job-as-a-different-user">spustit úlohu pod jiným uživatelem</a>. Jako jednu z doporučovaných možností uvádí utilitu <code>start-stop-daemon</code> dostupnou např. v Debianu a Ubuntu, která "jednoduše spustí daný příkaz poté, co změní UID/GID (exec bez forku)", což je přesně to, k čemu jsme oklikou došli sami. U <code>su</code> a <code>sudo</code> uvádí další dosud neuvažovanou nevýhodu a to, že skrze PAM zapisují záznamy o přihlašování uživatele do <code>wtmp</code>, což je při obyčejném spouštění aplikace spíše nežádoucí chování. Téměř na konci této sekce dokumentace je mezi příklady se <code>su</code> a <code>sudo</code> jakoby mimochodem zmíněna direktiva <code>expect</code>.</p>
 
-<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci obezřetně". Následuje několik odstavců o tom, jak se chovají různé typy aplikací, některé neforkují vůbec, jiné forkují jednou a ještě jiné dvakrát a co z toho plyne pro Upstart, který musí být schopen referencovat a spravovat správný process. Kdybychom si tuto část přečetli už kdysi, ušetřili bychom si všechny budoucí "zážitky" a problémy. S původní <code>/bin/su</code> variantou v konfiguračním souboru by bylo správné přidat dodatečný řádek <code>expect fork</code>, který by Upstartu oznámil, že má čekat právě jeden fork spouštěné aplikace. Tudíž by nespravoval <code>/bin/su</code>, ale Javu/Kafku. Tuto možnost jsme už ovšem nezkoušeli, protože jsme se rozhodli jít původně naznačenou cestou.</p>
+<p><a href="http://upstart.ubuntu.com/cookbook/#expect">Popis <code>expect</code></a> je uveden rámečkem s varováním "extrémně důležitá direktiva: čtěte tuto sekci pozorně". Následuje několik odstavců o tom, jak se chovají různé typy aplikací. Některé neforkují vůbec, jiné forkují jednou a ještě jiné dvakrát a co z toho všeho plyne pro Upstart, který musí být schopen referencovat a spravovat správný process. Kdybychom si tuto část přečetli už kdysi, ušetřili bychom si všechny budoucí zážitky a problémy. S původní <code>/bin/su</code> variantou v konfiguračním souboru by bylo správné přidat dodatečný řádek <code>expect fork</code>, který by Upstartu oznámil, že má čekat právě jeden fork spouštěné aplikace. Tudíž by nespravoval <code>/bin/su</code>, ale Kafku/JVM. Tuto možnost jsme už ovšem nezkoušeli, protože jsme se rozhodli jít dříve naznačenou cestou.</p>
 
 
 <h3>Přepnutí uživatele</h3>
 
-<p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je zajímavé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj, a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tata situaci se může porovnat například se su a sudo - dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude.</p>
+<p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je překvapivé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tato situace se může porovnat například se <code>su</code> a <code>sudo</code> - dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude. Vzájemně nekompatibilních možností je mnoho:</p>
 
 <ul>
-<li><code>start-stop-daemon</code> - pouze Debian a deriváty</li>
+<li><code>start-stop-daemon</code> - pouze Debian a jeho deriváty</li>
 <li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> - různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
 <li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> - přepis Debianího toolu z Perlu do C</li>
 <li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> - součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v <code>/bin/su</code></a>, ale není ani v CentOSu ani v Debianu</li>
@@ -400,7 +398,7 @@ login: /bin/su
 <li>A spousty dalších možností...</li>
 </ul>
 
-<p>Shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
+<p>Aby jich nebylo málo, shodou okolností máme vlastní nástroj <code>ff-runner</code>, který byl před lety vytvořen ke standartizaci spouštění našich serverových aplikací. Jednou z jeho vlastností je mimo jiné přepnutí na požadovaného uživatele a exec procesu (bez forku), už ho máme na serverech, takže volba byla celkem jasná.</p>
 
 </div>
 </body>
