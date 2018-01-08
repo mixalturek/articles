@@ -26,7 +26,7 @@
 
 <p>Nejsme banka, a tudíž v naší konfiguraci může taková situace občas (zřídka) nastat, nicméně všechno má své meze. Pokud není množství chyb v poměru k celkovému počtu událostí statisticky významné, není třeba nic řešit. Ale je velký rozdíl mezi desítkami až stovkami duplicit denně nebo tisíci za vteřinu po dobu několika hodin. Byl to zkrátka takový ošklivý... nepěkná věc, která se už neututlá a raději se s ní jde rovnou ven, protože by si jí stejně někdo brzy všimnul.</p>
 
-<p>Začátek všech alertů celkem jasně korespondoval s aktualizací první instance Kafky a následným restartem. Naše dosavadní zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, právě o tom je tento článek. My už je snad budeme mít v budoucnu také - <em>zkrátka chyba byla u nás a Kafka za nic nemohla</em>.</p>
+<p>Začátek všech alertů celkem jasně korespondoval s aktualizací první instance Kafky a následným restartem. Naše dosavadní zkušenosti s rolling restarty Kafky říkají, že se jedná spíše o křehkou operaci, při které se dost často něco po... pokazí a pokaždé nějak úplně jinak. Kreativita distribuovaných systémů dokáže vždy překvapit. Pokud máte s graceful restarty Kafky jiné, lepší zkušenosti, čtěte dál, právě o tom je tento článek. My už je snad budeme mít v budoucnu také &ndash; <em>zkrátka chyba byla u nás a Kafka za nic nemohla</em>.</p>
 
 <p>Během zpětné analýzy si osvěžíme principy operačních systémů, setkáme se s tucty známých i méně známých termínů, objevíme naprosto nečekané rozdíly v distribucích založených na RedHatu a Debianu a také se mimo jiné zanoříme do zdrojových kódů jistého unixového nástroje, který lidstvo denně používá už desítky let. Text se může zdát místy trochu složitější, ale nenechte se odradit, čtení až do konce bude určitě stát za to.</p>
 
@@ -57,7 +57,7 @@
 
 <p>V nejjednodušší formě se Kafka používá k oddělení aplikací produkujících události od aplikací, které je zpracovávají. Producenti a konzumenti jsou naprosto nezávislé systémy a mají plně oddělený životní cyklus, spojuje je pouze formát přenášených zpráv.</p>
 
-<p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>. Na rozdíl od nich garantuje pořadí doručení událostí - v jádru své architektury obsahuje datovou strukturu <a href="https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying">log</a>. Díky tomuto napohled malému rozdílu může být jednou z jejích dalších aplikací i <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a> (tzv. lambda architektura), kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají pouze formu <em>materialized view</em> a dají se kdykoli přepočítat.</p>
+<p>Kafka bývá často srovnávána s messaging systémy typu <a href="https://www.rabbitmq.com/">RabbitMQ</a>. Na rozdíl od nich garantuje pořadí doručení událostí &ndash; v jádru své architektury obsahuje datovou strukturu <a href="https://engineering.linkedin.com/distributed-systems/log-what-every-software-engineer-should-know-about-real-time-datas-unifying">log</a>. Díky tomuto napohled malému rozdílu může být jednou z jejích dalších aplikací i <a href="https://www.confluent.io/blog/turning-the-database-inside-out-with-apache-samza/">primární databáze systému</a> (tzv. lambda architektura), kdy tradiční databáze a úložiště (relační SQL databáze, <a href="http://hadoop.apache.org/">Hadoop</a>, <a href="https://www.elastic.co/">Elasticsearch</a>, <a href="http://cassandra.apache.org/">Cassandra</a>, <a href="https://redis.io/">Redis</a>, atd.) mají pouze formu <em>materialized view</em> a dají se kdykoli přepočítat.</p>
 </div>
 
 <h2>Duplicity, duplicity, duplicity</h2>
@@ -210,7 +210,7 @@ Parent: child exited 0
 <li>Nevím.</li>
 </ul>
 
-<p>Správnou odpověď naleznete dále v textu a - ať už jste hlasovali jakkoli - nejspíš vás překvapí...</p>
+<p>Správnou odpověď naleznete dále v textu a &ndash; ať už jste hlasovali jakkoli &ndash; nejspíš vás překvapí...</p>
 </div>
 
 
@@ -386,15 +386,17 @@ login: /bin/su
 
 <h3>Přepnutí uživatele</h3>
 
-<p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je překvapivé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tato situace se může porovnat například se <code>su</code> a <code>sudo</code> - dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude. Vzájemně nekompatibilních možností je mnoho:</p>
+<p>Vraťme se k Debianímu <code>start-stop-daemon</code>, který bohužel na CentOSu není dostupný, a jeho alternativám. Je překvapivé zjistit, že nejspíš neexistuje žádný univerzálně dostupný nástroj a že každá distribuce poskytuje ve výchozí instalaci něco jiného a nekompatibilního. Nástroje mají jiná jména, jiné parametry a jiné možnosti. Konfigurační soubor Upstartu by nebyl přenositelný mezi Linuxovými distribucemi (pokud pomineme fakt dostupnosti samotného Upstartu v distribucích). Samozřejmě všechno se dá nějakým způsobem doinstalovat, třeba i velice jednoduše, ale kdo by se o to chtěl starat. Tato situace se může porovnat například se <code>su</code> a <code>sudo</code> &ndash; dá se na ně spolehnout, že budou dostupné tak nějak vždycky a všude. Vzájemně nekompatibilních možností je mnoho:</p>
 
 <ul>
-<li><code>start-stop-daemon</code> - pouze Debian a jeho deriváty</li>
-<li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> - různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
-<li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> - přepis Debianího toolu z Perlu do C</li>
-<li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> - součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v <code>/bin/su</code></a>, ale není ani v CentOSu ani v Debianu</li>
-<li><a href="https://github.com/tianon/gosu">gosu</a> - používaný v kontejnerech a Docker světě</li>
+<li><code>start-stop-daemon</code> &ndash; pouze Debian a jeho deriváty</li>
+<li><code>daemon</code> utilita z <code>/etc/init.d/functions</code> &ndash; různě po webu doporučovaná CentOS alternativa ke <code>start-stop-daemon</code></li>
+<li>další <a href="https://github.com/daleobrien/start-stop-daemon"><code>start-stop-daemon</code></a> &ndash; přepis Debianího toolu z Perlu do C</li>
+<li><a href="https://git.kernel.org/pub/scm/utils/util-linux/util-linux.git/tree/sys-utils/setpriv.c"><code>setpriv</code></a> &ndash; součást util-linux, <a href="https://github.com/karelzak/util-linux/issues/443#issuecomment-304610565">zmíněný v diskuzi u reportu o chybě v <code>/bin/su</code></a>, ale není ani v CentOSu ani v Debianu</li>
+<li><a href="https://github.com/tianon/gosu">gosu</a> &ndash; používaný v kontejnerech a Docker světě</li>
+<li><a href="https://github.com/ncopa/su-exec">su-exec</a> &ndash; přepis <code>gosu</code> z Go do C kvůli menší velikosti</li>
 <li>Python: <code><a href="https://docs.python.org/3/library/os.html">import os</a> ; os.setuid(...) ; os.exec*(...)</code>. Při použití pozor na <a href="https://www.dwheeler.com/secure-programs/Secure-Programs-HOWTO/environment-variables.html">reset prostředí</a>!</li>
+<li><code>chroot --userspec=USER:GROUP ...</code> &ndash; jednoznačně nejlépe přenositelný nástroj, který je ale opět navržený pro úplně jiná použití a tudíž s možnými riziky</li>
 <li>A spousty dalších možností...</li>
 </ul>
 
