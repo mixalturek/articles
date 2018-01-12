@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>Přání býti kafkou</title>
+    <title>Přání býti Kafkou</title>
 
     <style media="all">
         body { background-color: silver; font-family: sans-serif; text-align: justify; line-height: 1.4em; }
@@ -18,7 +18,7 @@
 <body>
 <div id="page">
 
-<h1>Přání býti kafkou</h1>
+<h1>Přání býti Kafkou</h1>
 
 <p id="perex">Když se jeden Linux admin a jeden backend vývojář rozhodnou vyzkoumat příčinu problému, který je pravidelně otravuje při restartech distribuované cloudové služby, můžou se postupně ponořit opravdu hluboko...</p>
 
@@ -43,7 +43,7 @@
 
 <p>Vyčištěné události se z DC Kafka clusterů mirrorují pomocí standardního Mirror maker toolu do tzv. master Kafky, odkud je dále vyčítají finální konzumenti do <a href="http://hadoop.apache.org/">Hadoopu/HDFS</a>, vybrané topiky tečou do <a href="https://www.elastic.co/">Elasticsearche</a>, malá frakce se sampluje na stage a dev prostředí, popř. nad streamem běží nejrůznější realtime analýzy. Kafka otevírá spoustu možností.</p>
 
-<p class="img"><img src="img/kafka_pipeline.png" /></p>
+<p class="img"><img src="img/kafka_pipeline.png" alt="Schéma pipeline" /></p>
 
 <p>Každá z aplikací běží replikovaně v několika instancích. Pro rychlou představu: Receiverů a Input Filtrů je 11, Kafka brokerů celkem 14, v rámci každého Kafka clusteru musí samozřejmě běžet i cluster <a href="https://zookeeper.apache.org/">ZooKeeperů</a>. Data z každého datacentra kopíruje 5 instancí Mirror makerů. Všichni konzument klienti se dále replikují nejen na úrovni instancí a strojů, ale, aby se zvýšil paralelismus, i pomocí konfigurovatelného počtu aplikačních vláken. Objem zpracovávaných dat s připojováním a rozšiřováním jednotlivých aplikací v čase neustále narůstá. Základním požadavkem je možnost snadného škálování na všech úrovních, jinak by systém už dávno nebyl udržitelný.</p>
 
@@ -68,8 +68,8 @@
 
 <p>Jako viník byl nakonec podle grafů odhalen Mirror maker, kterému se v daném čase skokově zvýšil počet zkonzumovaných zpráv. V globálním pohledu to není tak zřejmé, ale při zaostření pouze na Frankfurt bylo vše ihned jasné. Po restartu se datový přenos vrátil zpět na původní hodnoty a integrační testy znovu samým štěstím zezelenaly.</p>
 
-<p class="img"><img src="img/duplicates_mirrors_all.png" /></p>
-<p class="img"><img src="img/duplicates_mirrors_fra.png" /></p>
+<p class="img"><img src="img/duplicates_mirrors_all.png" alt="Globální graf počtu zkonzumovaných zpráv" /></p>
+<p class="img"><img src="img/duplicates_mirrors_fra.png" alt="Graf počtu zkonzumovaných zpráv ve frankfurtském datacentru" /></p>
 
 <p>Poznámka na okraj pro úplnost článku: Chybu v Mirror makeru a potažmo v libovolném Kafka konzumentu jsme nedokázali vystopovat. Na základě logů jsme měli několik teorií, ale všechny jsme bohužel dokázali celkem snadno vyvrátit. Bug report do Kafky tedy nemělo cenu vytvářet, protože jsme neměli žádné vodítko, kterým směrem obrátit pozornost Kafka vývojářů. Ti jsou mimochodem velice aktivní a odpovídají prakticky okamžitě, už jsme pár chyb v minulosti hlásili.</p>
 
@@ -92,7 +92,7 @@
 <li>Konzumenti se občas škaredě zblázní. A když píšu škaredě, myslím tím opravdu <strong>škaredě</strong>. Výše byl popsán problém s duplikacemi, ale už jsme u několika mála partition a skupin konzumentů viděli i ztrátu offsetů, což by nemělo nikdy, ale opravdu nikdy nastat. Podle logů byla tato ztráta pravděpodobně způsobená chvilkovou nedostupností dat, kdy Kafka nejspíše klientovi odpověděla aniž by byla plně inicializovaná. Nevalidní offset při požadavku na data spolu s nevhodnou konfigurací <code>auto.offset.reset = earliest</code> způsobil skok na začátek logu a následnou bolestivou rekonzumaci všech dat, tj. posledních několika dnů. Od jisté doby už nepoužíváme <code>earliest</code>, ale <code>latest</code> s všudypřítomným komentářem, že je lepší přeskočit a ztratit pár minut, než zbytečně všechno vyčítat, znovuzpracovávat a řešit, že všechna data máme v HDFS a dalších systémech dvakrát. Samozřejmě záleží na službě a očekáváních.</li>
 </ul>
 
-<p class="img"><img src="img/mirror_lag.png" /></p>
+<p class="img"><img src="img/mirror_lag.png" alt="Graf zpoždění při zpracovávání zpráv" /></p>
 
 <p>Vypadá to, jako bychom Kafku neukončovali korektně. V hlavě se nám objevuje termín <code>SIGKILL</code>, ale kdo by ho posílal a proč?</p>
 
@@ -315,6 +315,8 @@ Date:   Tue Aug 17 13:21:44 2010 +0200
 </pre>
 
 <p>Tento bug (nebo možná pouze feature) jsme samozřejmě poctivě <a href="https://github.com/karelzak/util-linux/issues/443">nahlásili</a> a dokonce i <a href="https://github.com/karelzak/util-linux/pull/444">opravili</a>. Po diskuzi s vývojáři (zdravíme Karla Žáka) to ale nevypadá, že by naše úprava byla někdy aplikována. Ačkoli změna oproti současnému stavu dává smysl, protože by se <code>/bin/su</code> chovalo konzistentněji, nemáme motivaci se ji pokusit protlačit.</p>
+
+<p class="img"><img src="img/su_fix.png" alt="Kód opravy na GitHubu" /></p>
 
 
 <h2>Není su jako su</h2>
