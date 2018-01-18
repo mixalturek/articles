@@ -197,7 +197,7 @@ Parent: child exited 0
 
 <h2><code>su kafka</code></h2>
 
-<p>Kdo je tedy vrah? Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor s nastaveným <code>sticky bitem</code> a bývá často skloňován v knihách o bezpečnosti v unixových prostředích. V našem případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru, ale přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem. Pojďme zkusit najít v <code>/bin/su</code> odpověď na naši otázku.</p>
+<p>Kdo je tedy vrah? Ano, správně. Je to někdo, kdo téměř ani nebyl zmíněn, téměř neviditelný pomocník <code>/bin/su</code>. Tento užitečný prográmek je asi nejznámější soubor s nastaveným <code>setuid bitem</code> a bývá často skloňován v knihách o bezpečnosti v unixových prostředích. V našem případě se <code>/bin/su</code> nepoužívá k typickému zvyšování práv na roota, např. kvůli instalaci nového softwaru, ale přesně naopak, tedy ke snížení práv spouštěného procesu, aby Kafka neběžela pod rootem. Pojďme zkusit najít v <code>/bin/su</code> odpověď na naši otázku.</p>
 
 
 <div class="side">
