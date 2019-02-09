@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (19)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (19)</h1>
+
+<p class="perex">Vše, co se týká SDL audio funkcí už máme probráno, takže se zkusíme podívat na rozšiřující knihovnu SDL_mixer.</p>
+
+
+<h2>SDL_mixer</h2>
+
+<p>Knihovna <a href="http://www.libsdl.org/projects/SDL_mixer/">SDL_mixer</a> poskytuje snadno použitelné funkce pro mixování zvuků a hudby. Je vhodná obzvlášť pro ty, kterým připadá standardní SDL audio API příliš nízkoúrovňové a strohé. Aby bylo se SDL_mixerem vše co nejjednodušší, přímo v knihovně lze nalézt podporu i pro nahrávání zvuků z formátů jako jsou .WAV, .AIFF, .VOC, .OGG, .MP3 a další, u některých ale jen s použitím externích dekodérů.</p>
+
+<p>SDL_mixer je, stejně jako SDL, šířen pod licencí GNU LGPL. Veškeré rozhraní je deklarováno v hlavičkovém souboru SDL_mixer.h a při linkování programu je nutné přidat do příkazové řádky řetězec -lSDL_mixer. Všechny funkce z této knihovny začínají na předponu 'Mix_'.</p>
+
+<p>Při zakládání aplikace byste si měli vždy rozmyslet, zda budete pro zvuky a hudbu používat SDL_mixer, nebo SDL audio funkce. Kombinace obou technik je sice možná, ale nemusí být zrovna šťastným nápadem. U SDL_mixeru byste se měli rozhodně vyvarovat volání funkcí jako SDL_OpenAudio(), SDL_CloseAudio(), SDL_PauseAudio(), SDL_LockAudio(), SDL_UnlockAudio() apod., mohou být konfliktní s jejich Mix_*() analogiemi.</p>
+
+
+<h2>Obecné funkce</h2>
+
+<p>Inicializace knihovny a současně i otevření audio zařízení se v SDL_mixeru provádí funkcí Mix_OpenAudio().</p>
+
+<pre>
+int Mix_OpenAudio(int frequency, Uint16 format,
+		int channels, int chunksize);
+</pre>
+
+<p>Parametry by měly být jasné. Místo konkrétní frekvence může být použita symbolická konstanta MIX_DEFAULT_FREQUENCY, která má hodnotu 22050 Hz. Za druhý parametr, formát vzorků, je možné předat libovolnou z konstant definovaných v SDL, popř. MIX_DEFAULT_FORMAT má hodnotu AUDIO_S16SYS. U třetího parametru označuje jednička mono a dvojka stereo, chunksize definuje velikost každého mixovaného bloku.</p>
+
+<p>Funkce oznamuje chybu vrácením -1, je-li vše v pořádku, vrátí nulu.</p>
+
+<p>Zavření zařízení a deinicializace knihovny jsou uskutečňovány funkcí Mix_CloseAudio(). Mix_GetError() slouží pro získání řetězce obsahujícího popis poslední chyby a pomocí Mix_SetError() ji lze definovat.</p>
+
+<pre>
+void Mix_CloseAudio();
+
+char *Mix_GetError();
+void Mix_SetError(const char *fmt, ...);
+</pre>
+
+<p>V následujícím příkladu je otevřeno audio zařízení s předdefinovanou frekvencí a formátem, bude se jednat o stereo, a velikost bloků dat bude 1024 bytů.</p>
+
+<pre>
+// Inicializace
+if(Mix_OpenAudio(MIX_DEFAULT_FREQUENCY,
+		MIX_DEFAULT_FORMAT, 2, 1024) == -1)
+{
+	printf("Mix_OpenAudio(): %s\n", Mix_GetError());
+	return false;
+}
+
+// Deinicializace
+Mix_CloseAudio();
+</pre>
+
+<p>Parametry aktuálně otevřeného audio zařízení lze získat voláním funkce Mix_QuerySpec(), která při chybě vrací nulu.</p>
+
+<pre>
+int Mix_QuerySpec(int *frequency, Uint16 *format, int *channels);
+</pre>
+
+
+<h2>Zvuky</h2>
+
+<p>Zvuky jsou v SDL_mixeru reprezentovány strukturou Mix_Chunk, jejíž popis není pro programování důležitý. Mělo by stačit předávat do funkcí ukazatele na její objekty.</p>
+
+<p>Pro základní nahrávání zvuků ze souboru slouží funkce Mix_LoadWAV(). Předává se jí jméno souboru na disku a v případě úspěchu je vrácen ukazatel na zvuk, chyba je oznámena klasicky pomocí NULL. Druhá funkce, Mix_LoadWAV_RW(), se používá pro nahrávání ze SDL_RWops. Nenulová hodnota ve druhém parametru způsobí automatické zavření a uvolnění zdroje, když už není potřeba.</p>
+
+<pre>
+Mix_Chunk *Mix_LoadWAV(char *file);
+Mix_Chunk *Mix_LoadWAV_RW(SDL_RWops *src, int freesrc);
+</pre>
+
+<p>Další možností, jak nahrávat zvuky do aplikace jsou dvě funkce Mix_QuickLoad_*(), které umožňují pracovat s daty v paměti. Už v době volání funkce musejí být zvuky ve výstupním formátu a v podstatě většinu chyb není testována, použití může být tudíž relativně nebezpečné. Vždy byste měli vědět, co děláte.</p>
+
+<pre>
+Mix_Chunk *Mix_QuickLoad_WAV(Uint8 *mem);
+Mix_Chunk *Mix_QuickLoad_RAW(Uint8 *mem);
+</pre>
+
+<p>Po skončení práce s daným zvukem by se měl vždy pomocí Mix_FreeChunk() uvolnit.</p>
+
+<pre>
+void Mix_FreeChunk(Mix_Chunk *chunk);
+</pre>
+
+<p>Hlasitost zvuku se dá softwarově nastavit voláním Mix_VolumeChunk(), které se předává požadovaná hlasitost v rozsahu od nuly do MIX_MAX_VOLUME (=128). Návratovou hodnotou je předchozí hlasitost.</p>
+
+<pre>
+int Mix_VolumeChunk(Mix_Chunk *chunk, int volume);
+</pre>
+
+<p>Jak poznáme dále, je tato funkce pouze jednou z možností, jak nastavit výslednou hlasitost zvukového výstupu.</p>
+
+
+<h2>Kanály a přehrávání</h2>
+
+<p>SDL_mixer defaultně alokuje celkem osm kanálů, v každém z nich může být v jednom okamžiku přehráván právě jeden zvuk. Pokud je spuštěn zvuk v kanálu, ve kterém se už něco přehrává, původní se zastaví a je spuštěn nový. Počet kanálů se dá upravit funkcí Mix_AllocateChannels().</p>
+
+<pre>
+int Mix_AllocateChannels(int numchans);
+</pre>
+
+<p>Pokud bude požadovaný počet kanálů menší než původní, budou nejvyšší zavřeny a uvolněny. Návratovou hodnotou je počet nově alokovaných kanálů.</p>
+
+<p>Podobně, jako šlo nastavit hlasitost zvuku, lze navíc nastavit i hlasitost kanálu. Za první parametr se předává pořadové číslo kanálu, v případě zadání -1 se operace provede nad všemi (platí obecně). Druhým parametrem se definuje požadovaná hlasitost.</p>
+
+<pre>
+int Mix_Volume(int channel, int volume);
+</pre>
+
+<p>Návratovou hodnotou je aktuální hlasitost kanálu, popř. průměr, pokud byly zvoleny všechny.</p>
+
+<p>Příkaz na přehrávání zvuku poskytuje funkce Mix_PlayChannel(). Prvním parametrem se opět volí kanál, -1 zde má význam prvního volného kanálu. Druhý parametr specifikuje přehrávaný zvuk a třetí počet opakování + 1 (nula jedenkrát, jedna dvakrát atd.). Speciální hodnotou je -1, označuje nekonečnou smyčku.</p>
+
+<pre>
+int Mix_PlayChannel(int channel, Mix_Chunk *chunk, int loops);
+
+int Mix_PlayChannelTimed(int channel, Mix_Chunk *chunk,
+		int loops, int ticks);
+</pre>
+
+<p>U druhé uvedené funkce je možné v posledním parametru zadat navíc časový limit v milisekundách. Pokud po uplynutí této doby zvuk stále hraje, bude automaticky ukončen.</p>
+
+<p>Obě funkce vracejí číslo kanálu, ve kterém bude zvuk přehráván nebo -1 na znamení chyby. Většinou se jedná o to, že žádný kanál nebyl volný, ale může se také jednat o kritickou chybu.</p>
+
+<p>Další možností, jak spustit přehrávání zvuku je funkce Mix_FadeInChannel(). Za poslední parametr se předává časový interval v milisekundách, během kterého zvuk postupně nabývá na síle.</p>
+
+<pre>
+int Mix_FadeInChannel(int channel, Mix_Chunk *chunk,
+		int loops, int ms);
+int Mix_FadeInChannelTimed(int channel, Mix_Chunk *chunk,
+		int loops, int ms, int ticks);
+</pre>
+
+<p>Zvuk přehrávaný v kanálu se dá pozastavit voláním funkce Mix_Pause() a následně obnovit pomocí Mix_Resume(). Pro kompletní stopnutí slouží jedna ze tří následujících funkcí. Mix_HaltChannel() zastaví přehrávání ihned, Mix_ExpireChannel() až po uplynutí časového intervalu a Mix_FadeOutChannel() způsobí pro postupné odeznívání.</p>
+
+<pre>
+void Mix_Pause(int channel);
+void Mix_Resume(int channel);
+
+int Mix_HaltChannel(int channel);
+int Mix_ExpireChannel(int channel, int ticks);
+int Mix_FadeOutChannel(int channel, int ms);
+</pre>
+
+<p>Možná je to zbytečné připomínat, ale zvláště u těchto funkcí se lze velice často setkat s parametrem -1, který operuje nad všemi kanály.</p>
+
+<p>Pomocí Mix_ChannelFinished() lze předat SDL_mixeru ukazatel na funkci, která se pak automaticky spustí, kdykoli se přehrávání v jakémkoli kanálu ukončí. Nikdy by se v ní neměly volat žádné audio funkce!</p>
+
+<pre>
+void Mix_ChannelFinished(void (*channel_finished)(int channel));
+</pre>
+
+<p>V následujícím příkladu se po ukončení přehrávání vypíše informační zpráva.</p>
+
+<pre>
+// Callback funkce
+void ChannelFinishedCallback(int channel)
+{
+	printf("Kanál %d ukončil přehrávání.\n", channel);
+}
+
+// Předání ukazatele na funkci
+Mix_ChannelFinished(ChannelFinishedCallback);
+</pre>
+
+<p>Následující skupina funkcí slouží pro dotazy na stav přehrávání, nemělo by být třeba je zdlouhavě popisovat. Pokud je za kanál předáno číslo -1, vrací první dvě funkce počet kanálů, které vyhověly dotazům. Poslední uvedená funkce vrátí při dotazu jednu z konstant MIX_FADING_IN, MIX_FADING_OUT nebo MIX_NO_FADING. Parametr -1 zde není validní.</p>
+
+<pre>
+int Mix_Playing(int channel);
+int Mix_Paused(int channel);
+Mix_Fading Mix_FadingChannel(int which);
+</pre>
+
+<p>Poslední funkce tohoto článku, Mix_GetChunk(), vrací ukazatel na zvuk, který je přehráván v definovaném kanálu, popř. byl přehráván jako poslední. Jelikož už může být zvuk uvolněn, nemusí být ukazatel v dané chvíli validní!</p>
+
+<pre>
+Mix_Chunk *Mix_GetChunk(int channel);
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>SDL_mixer</h3>
+
+<p>Aplikace inicializuje SDL_mixer, otevře audio zařízení a nahraje zvuk. Začátek přehrávání je umožněn stiskem mezerníku a konec pomocí enteru. V obou případech je ponechána doba tří sekund na postupné nabírání na síle resp. odeznění. <a href="./src/sdl_19_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="http://www.libsdl.org/projects/SDL_mixer/">Domovská stránka knihovny SDL_mixer</a></li>
+<li><a href="./src/sdl_19_a.tar.gz">Příklad: SDL_mixer</a></li>
+<li><a href="sdl_19.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Ze SDL_mixeru máme probránu cca. polovinu, takže se budeme příště věnovat té druhé. Bude především o hudbě a efektech.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 28.06.2005</div>
+
+</body>
+</html>

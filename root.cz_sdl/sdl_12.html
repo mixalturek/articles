@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (12)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (12)</h1>
+
+<p class="perex">Pravděpodobně nejpoužívanějšími vstupními zařízeními počítače jsou klávesnice a myš, v našem seriálu začneme právě klávesnicí. Podíváme se na ni jak z událostního pohledu, tak &quot;přímým&quot; přístupem a uděláme první krok k interaktivním hrám.</p>
+
+
+<h2>Události klávesnice</h2>
+
+<p>SDL definuje pro klávesnici dvě události, první je generována, když uživatel stiskne klávesu, a druhá, když ji uvolní. Parametr type objektu SDL_Event je v takovém případě nastaven na hodnotu SDL_KEYDOWN resp. SDL_KEYUP a podrobnosti o události jsou uloženy do proměnné key, což je objekt struktury SDL_KeyboardEvent.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 state;
+	SDL_keysym keysym;
+} SDL_KeyboardEvent;
+</pre>
+
+<p>Jak už bylo řečeno, type obsahuje buď hodnotu SDL_KEYDOWN nebo SDL_KEYUP. Atribut state nese naprosto stejnou informaci, ale používá pro to jména SDL_PRESSED a SDL_RELEASED, jinak žádný rozdíl.</p>
+
+<p>Poslední z uvedených atributů je struktura SDL_keysym poskytující informace o stisknuté klávese. Je definována následovně.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 scancode;
+	SDLKey sym;
+	SDLMod mod;
+	Uint16 unicode;
+} SDL_keysym;
+</pre>
+
+<p>Scancode představuje scankód, který pochází přímo od hardwaru, ale v praxi se v podstatě nepoužívá.</p>
+
+<p>Naproti tomu proměnná sym, odvozená od SDLKey, je používána velice často, nese v sobě symbolické jméno stisknuté klávesy. Proměnná mod oznamuje přítomnost modifikátorů, jako jsou shift, ctrl, alt atd. Současným zkoumáním sym a mod, lze tedy velice snadno implementovat klávesové zkratky.</p>
+
+<p>Poslední položka obsahuje, pokud jsou překlady zapnuté, hodnotu klávesy/znaku v kódování unicode.</p>
+
+<p>Všechny uvedené skutečnosti budou podrobně rozebrány v následujícím textu...</p>
+
+
+<h2>Symbolická jména kláves</h2>
+
+<p>SDLKey je v hlavičkovém souboru SDL_keysym.h deklarováno jako výčtový typ, který definuje symbolická jména jednotlivých kláves. Znaky z první poloviny ASCII tabulky (do 127) jsou namapovány na odpovídající klávesy na klávesnici. Z toho plyne, že konstanta SDLK_a může být při porovnávání parametru sym nahrazena obyčejným znakem 'a' a podobně.</p>
+
+<p>Všechna symbolická jména kláves začínají na předponu 'SDLK_', za kterou následuje vlastní název - SDLK_SPACE (mezerník), SDLK_RETURN (enter), SDLK_UP (šipka nahoru), SDLK_F1 (funkční klávesa F1), atd. Nejrozumnější asi bude, když si tato jména najde každý sám v SDL dokumentaci. Dole v hlavním menu je umístěn odkaz <a href="http://sdldoc.csn.ul.ie/sdlkey.php">8-1. SDL Keysym definitions</a>.</p>
+
+<p>Na stejném místě lze nalézt i definice modifikátorů z parametru mod, jejich názvy začínají na 'KMOD_' a při testech se vždy využívá funkce bitového součinu (AND). Jelikož je jich jen několik, uvedeme si je i do textu článku. Mimochodem, stejným způsobem jako SDLMod je definován i SDLKey.</p>
+
+<pre>
+typedef enum
+{
+	KMOD_NONE  = 0x0000,
+	KMOD_LSHIFT= 0x0001,
+	KMOD_RSHIFT= 0x0002,
+	KMOD_LCTRL = 0x0040,
+	KMOD_RCTRL = 0x0080,
+	KMOD_LALT  = 0x0100,
+	KMOD_RALT  = 0x0200,
+	KMOD_LMETA = 0x0400,
+	KMOD_RMETA = 0x0800,
+	KMOD_NUM   = 0x1000,
+	KMOD_CAPS  = 0x2000,
+	KMOD_MODE  = 0x4000,
+} SDLMod;
+
+#define KMOD_CTR   (KMOD_LCTRL|KMOD_RCTRL)
+#define KMOD_SHIFT (KMOD_LSHIFT|KMOD_RSHIFT)
+#define KMOD_ALT   (KMOD_LALT|KMOD_RALT)
+#define KMOD_META  (KMOD_LMETA|KMOD_RMETA)
+</pre>
+
+<p>Na následujícím příkladu se implementuje klávesová zkratka (levý)Alt+Enter, jejímž výsledkem bude přepnutí okna do fullscreenu.</p>
+
+<pre>
+// Zpracování událostí, stisk klávesy
+case SDLK_RETURN:
+	if(event.key.keysym.mod & KMOD_LALT)
+		if(!ToggleFullscreen())
+			return false;
+	break;
+</pre>
+
+<p>Pozn.: Funkce ToggleFullscreen() byla naprogramována v minulém dílu tohoto seriálu.</p>
+
+
+<h2>Unicode znaky</h2>
+
+<p>Na chvíli se ještě vrátíme zpět k SDL_keysym. Pokud je parametr unicode v této struktuře nenulový, pak obsahuje unicode znak, který odpovídá stisknuté klávese a je-li navíc horních devět bitů nulových, bude ekvivalentní ASCII znaku (16 - 9 = 7 ;-). SDL dokumentace obsahuje příklad demonstrující obsah tohoto odstavce.</p>
+
+<pre>
+char ch;
+if((keysym.unicode &amp; 0xFF80) == 0)
+	ch = keysym.unicode &amp; 0x7F;
+else
+	printf("Mezinárodní znak.\n");
+</pre>
+
+<p>Jelikož jsou překlady znaků do unicode relativně výkonově náročné, jsou v SDL standardně vypnuté. Jednička, předaná do SDL_EnableUNICODE(), podporu zapíná, nula vypíná a mínus jedničky může být využito k dotazům.</p>
+
+<pre>
+int SDL_EnableUNICODE(int enable);
+</pre>
+
+
+<h2>Opakování událostí při držení klávesy</h2>
+
+<p>Windows programátory by po spuštění ukázkových příkladů mohlo teoreticky překvapit, že stisk klávesy, její déletrvající držení a uvolnění, způsobí vygenerování VŽDY DVOU událostí - zprávy o stisku a následně zprávy o uvolnění, nic dalšího.</p>
+
+<p>Ve Win32 API se narozdíl od SDL první zpráva WM_KEYDOWN (analogie SDL_KEYDOWN) pošle aplikaci při stisku a pokud je klávesa držena delší dobu, následují po určitém časovém intervalu zprávy další.</p>
+
+<p>SDL může být požádáno, aby se chovalo stejným způsobem. Slouží k tomu funkce SDL_EnableKeyRepeat(), jejíž parametr delay říká, za jak dlouho se má od stisku poslat první opakovací zpráva (čili druhá SDL_KEYDOWN v pořadí) a parametr interval specifikuje periodu odesílání následujících zpráv. Obě hodnoty jsou v jednotkách milisekund.</p>
+
+<pre>
+int SDL_EnableKeyRepeat(int delay, int interval);
+</pre>
+
+<p>Předání nuly do delay způsobí vypnutí opakování, což je v SDL implicitní stav. Místo zadání konkrétních hodnot, je možné časy specifikovat také symbolickými konstantami SDL_DEFAULT_REPEAT_DELAY a SDL_DEFAULT_REPEAT_INTERVAL. Funkce při úspěchu vrátí 0, jinak -1.</p>
+
+
+<h2>&quot;Přímý&quot; přístup ke klávesnici</h2>
+
+<p>Při programování her vzniká relativně často potřeba dotázat se kdykoli v programu, zda je určitá klávesa stisknutá nebo ne. Události jsou v tomto případě nepoužitelné, protože neinformují o aktuálním stavu, ale jen o jeho změnách. Proto lze v některých zdrojových kódech najít konstrukce podobné těm na následujícím výpise.</p>
+
+<pre>
+// Globální pole indikátorů klávesnice
+// V Init() nastavit všechny položky na false
+bool g_keys[MAX_KEYS];
+
+// Události stisku a uvolnění
+case SDL_KEYDOWN:
+	// Nastavit indikátor dané klávesy
+	g_keys[event.key.keysym.sym] = true;
+	break;
+
+case SDL_KEYUP:
+	// Vynulovat indikátor dané klávesy
+	g_keys[event.key.keysym.sym] = false;
+	break;
+
+// Zjištění stisku klávesy
+if(g_keys[SDKL_UP])
+	JdiNahoru(g_fps);
+else
+	NicNedelej();
+</pre>
+
+<p>Pozn.: Velikost globálního pole g_keys jsme definovali jako MAX_KEYS indikátorů. V některých knihovnách je zvykem jeho rozsah definovat na 256, nicméně letmý pohled do SDL_keysym.h ukáže, že tuto konstantu v SDL použít nelze, definovaných kláves je víc.</p>
+
+<p>Po krátkém hledání můžeme v SDL objevit funkci SDL_GetKeyState(), jež vrací ukazatel na vnitřní pole indikátorů klávesnice (analogie našeho g_keys), které může být indexováno SDLK_* symboly. Není-li parametr funkce nastaven na NULL, SDL do něj vloží velikost tohoto pole.</p>
+
+<pre>
+Uint8 *SDL_GetKeyState(int *numkeys);</p>
+</pre>
+
+<p>Jedničková hodnota na indexu oznamuje, že je klávesa stisknutá, v případě nuly není. Lze také použít symbolické konstanty SDL_PRESSED a SDL_RELEASED. Před samotnými dotazy na klávesy může být vhodné funkcí SDL_PumpEvents() (viz minulý díl) informace v poli aktualizovat.</p>
+
+<p>Přepis kódu výše do SDL by tedy mohl vypadat následovně.</p>
+
+<pre>
+// Zjištění stisku klávesy
+SDL_PumpEvents();
+
+Uint8* keys;
+keys = SDL_GetKeyState(NULL);
+
+if(keys[SDLK_UP] == SDL_PRESSED)
+	JdiNahoru(g_fps);
+else
+	NicNedelej();
+</pre>
+
+<p>Pomocí SDL_GetKeyState() je samozřejmě možné zjistit i přítomnost modifikátorů, většinou se však využívá služeb specializované funkce SDL_GetModState(). V jejím případě není vrácen ukazatel na pole, ale bitová maska.</p>
+
+<pre>
+SDLMod SDL_GetModState(void);
+void SDL_SetModState(SDLMod modstate);
+</pre>
+
+<p>Pomocí druhé uvedené funkce lze pro program klávesu modifikátoru virtuálně stisknout.</p>
+
+
+<h2>Kdy použít události a kdy přímý přístup</h2>
+
+<p>Zkusíme, podobně jako u událostí výše, definovat klávesovou zkratku Alt+Enter pro přepnutí okna do fullscreenu a pak si vysvětlíme, proč není tento kód obecně použitelný.</p>
+
+<pre>
+// Tento kód není obecně použitelný!!!
+
+if(keys[SDLK_RETURN] == SDL_PRESSED)
+	if(SDL_GetModState() & KMOD_LALT)
+		if(!ToggleFullscreen())
+			return false;
+</pre>
+
+<p>Výpis je ve svém principu naprosto správný, ale po zobrazení kompletního zdrojového kódu kterékoli z ukázkových aplikací zjistíme, že samotný test klávesové zkratky a tedy i přepnutí do fullscreenu je vloženo do hlavního cyklu aplikace, který se provádí neustále dokola.</p>
+
+<p>Řekněme, že se právě teď nacházíme ve fullscreenu a chceme se přepnout do okna. Kód správně detekuje Alt+Enter a změní stav. Problém je, že za několik milisekund (po vykreslení a aktualizaci scény) nastane další průchod cyklem a uživatel stále drží Alt+Enter. Takže se aplikace opět přepne, tentokrát zpět do fullscreenu. To se bude opakovat neustále dokola, dokud budou obě klávesy stisknuté. Po uvolnění navíc není určen výsledek.</p>
+
+<p>Uvedeme si ještě jeden obecně nepoužitelný příklad.</p>
+
+<pre>
+// Tento kód není obecně použitelný!!!
+
+// Zpracování událostí klávesnice
+case SDLK_UP:
+	JdiNahoru(g_fps);
+	break;
+</pre>
+
+<p>Co se stane teď? Když uživatel stiskne šipku nahoru, postavička ve hře se posune o pár pixelů nahoru, ale pak zůstane stát. Při libovolně dlouhém držení klávesy přijde jen jedna zpráva o stisku.</p>
+
+<p>Z příkladů výše tedy jasně vyplývá, že na různé pohyby postaviček po scéně je vhodné používat přímý přístup ke klávesnici (rychlost pohybů vztahovat k aktuálnímu FPS) a přepínání nejrůznějších flagů ošetřovat událostmi. Obecnou platnost této poučky trochu nabourává funkce SDL_EnableKeyRepeat(), ale pokud se jí budeme držet, neměly by nastat žádné problémy...</p>
+
+
+<h2>Řetězec se jménem klávesy</h2>
+
+<p>Někdy může být potřebné zjistit jméno stisknuté klávesy. V SDL je to s pomocí funkce SDL_GetKeyName() velice snadné. Za parametr se předává symbolické jméno klávesy a výstupem je řetězec ukončený NULL.</p>
+
+<pre>
+char *SDL_GetKeyName(SDLKey key);
+</pre>
+
+<p>Následující kód by ve spuštěném programu zajistil výpisy jmen stisknutých kláves. Pro jednoduchost je uveden jen výpis do konzole, ale kdyby se text zobrazoval graficky do okna (např. s pomocí SDL_ttf), měli bychom k dispozici základní GUI výběru kláves pro ovládání hry.</p>
+
+<pre>
+// Zpracování událostí, stisk klávesy
+case SDL_KEYDOWN:
+	printf("%s\n", SDL_GetKeyName(
+			event.key.keysym.sym));
+	break;
+</pre>
+
+<p>Výstup by po několika úderech na klávesnici vypadal nějak takto:</p>
+
+<pre>
+space		// Mezerník
+return		// Enter
+caps lock
+left shift
+left ctrl
+f		// Písmeno f
+down		// Šipka dolů
+...
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Odrazy</h3>
+
+<p>Ukázkový program vykresluje objekt, se kterým je možno pomocí šipek (přímý přístup) pohybovat. Stisk nemění polohu přímo, ale je jím ovlivněno zrychlení, v každém průchodu je pozice zvětšována o rychlost. Také je aplikována gravitace. V případě, že objekt narazí do stěny (okraj okna), odrazí se a jeho rychlost je o něco zmenšena.</p>
+
+<p>Jako bonus byl v programu implementován pomocí událostí i jeden cheat. Na klávesnici se naťuká posloupnost &quot;cheat&quot; a co se stane, uvidíte po spuštění ;-). <a href="./src/sdl_12_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/12_prog_a.png" width="322" height="259" alt="Odrazy" /></div>
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_12_a.tar.gz">Příklad: Odrazy</a></li>
+<li><a href="sdl_02.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Podobným způsobem, jako byla dnes probrána klávesnice, se budeme příště věnovat práci s myší.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 12.04.2005</div>
+
+</body>
+</html>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8""?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs">
+
+<head>
+<title>Open source a free software</title>
+
+<style media="all">
+body
+{
+	margin: 100px 20% 100px 20%;
+	font-family: Verdana, "Bitstream Vera Sans", Geneva, sans-serif;
+	font-size: 10pt;
+	text-align: justify;
+	line-height: 1.8em;
+}
+
+h1, #h1a	{ text-align: center; }
+.img		{ text-align: center; }
+pre		{ line-height: 1.2em; }
+code		{ color: rgb(90, 90, 90); }
+</style>
+
+<style media="print">
+body		{ margin: 0%; }
+</style>
+
+</head>
+
+<body>
+
+<h1>Open source a free software</h1>
+
+<div id="h1a">Michal Turek, leden 2011</div>
+
+
+<h2>Abstrakt</h2>
+
+Článek představuje otevřený a svobodný software s nejčastěji používanými licencemi pro jejich tvorbu. Věnuje se programování přenositelných aplikací a portování na další systémy, konkrétně představuje multiplatformní knihovnu SDL a standard OpenGL pro tvorbu 3D grafických aplikací.
+
+
+<h2>Úvod</h2>
+
+<p>Fenomén otevřeného a svobodného software zasahuje velikou měrou do práce spousty počítačových uživatelů. Nemusíte být ani ortodoxní <i>linuxák</i>, a přesto s největší pravděpodobností - možná aniž byste to tušili - každodenně používáte aplikace s otevřeným zdrojovým kódem. Webové stránky možná namísto MS Internet Exploreru prohlížíte v Mozilla Firefoxu, své dokumenty píšete v OpenOffice a mobilní telefon vám pohání platforma Android. Toto je jen několik málo příkladů těch nejznámějších produktů, svět otevřeného software je obrovský.</p>
+
+<p>Jak už napovídá sám název, otevřený software je v jistém smyslu <i>otevřený</i>. Na rozdíl od uzavřených programů jsou k němu dostupné zdrojové kódy a to buď pouze k nahlédnutí tak i k vlastním úpravám. Dalším stupněm open source je tzv. svobodný software, ke  kterému jsou mimo zdrojových kódů dostupná i další práva. Jedná se především o možnost tento software používat, modifikovat a dále distribuovat. To, co můžete s programem a jeho zdrojovými kódy dělat se může lišit produkt od produktu, vždy záleží na licenci, pod kterou je šířen a ve které je vše velice konkrétně specifikováno.</p>
+
+
+<h2>Licence</h2>
+
+<p>Je smutnou pravdou, že u proprietárního software licence téměř nikdo nečte a při instalaci většinou uživatel bez jakéhokoli přemýšlení automaticky zaškrtává <i>Souhlasím</i>. U svobodného software mají licence pro uživatele mnohem větší význam a většinou jsou i mnohem více dodržovány.</p>
+
+<p>Licence svobodného software však nemusejí práva pouze dávat, mohou přijít i s povinnostmi. Typickým příkladem je příkaz poskytnout veškeré úpravy zdrojových kódů při distribuci upraveného produktu a tím dát ostatním tu samou možnost vylepšit již jednou vylepšený produkt. Licence nemusí zakazovat - a většinou také nezakazuje - produkt komerčně prodávat či ho paralelně distribuovat pod úplně jinou licencí (duální licencování).</p>
+
+<p>Množství nejrůznějších softwarových licencí je obrovské, dá se říci, že co produkt to jedna licence. Pojďme si spolu v rychlosti projít ty nejznámější z nich. Drobné upozornění... informace mohou být z důvodu snazší pochopitelnosti částečně zjednodušené, navíc principiálně nelze vtěsnat mnohastránkové právní dokumenty do několika řádek beze ztráty informace.</p>
+
+<ul>
+<li><em>Skupina proprietárních licencí</em>
+<p>Uvedeno pouze pro úplnost, přesahuje zaměření tohoto textu.</li>
+
+<li><em>Skupina open source licencí</em>
+<p>Tyto licence většinou dávají právo pouze ke čtení zdrojových kódů, ale striktně zakazují veškeré modifikace a další šíření. Dostupnost zdrojových kódů může být podmíněná finančně či dodatečnou smlouvou, nicméně výrazně zvyšuje důvěru v program i jeho tvůrce.</p>
+
+<p>Se zdrojovými kódy je vždy možné ověřit kvalitu a robustnost, mizerně naprogramovaný SW by nikdo neotevřel. Především pro programátora používajícího cizí knihovnu může být možnost nahlédnout pod pokličku velice prospěšná. Pokud něco nefunguje, jak má, podívá se do zdrojových kódů a jednoduše zjistí, zda je chyba na jeho straně, a nebo na straně tvůrce knihovny. V prvním případě sám zjistí, co dělá špatně, ve druhém autorovi nahlásí chybu a počká si na opravu.</p>
+</li>
+
+<li><em>GNU General Public License (GNU GPL), http://www.gnu.org/licenses/gpl.html</em>
+<p>GNU GPL je jednou z nejpopulárnějších a také nejkontroverznějších free software licencí. Zajišťuje, že jednou otevřený produkt si nemůže nikdo po výrazném vylepšení přisvojit a uzavřít, protože povinností všech distributorů je poskytnout zdrojové kódy veškerých úprav. Tato vlastnost má však i stinnou stránku, jedná se o tzv. <i>nakažlivost</i>. Pokud se v existujícím uzavřeném programu, libovolně velkém, použije byť i jediná řádka GPL kódu, musí se kompletně celý program otevřít a být dále šířen pod licencí GPL.</p>
+
+<p>Licence je milována tvůrci svobodného software, protože mají zajištěno, že žádná <i>nenáviděná korporace</i> neukradne jejich práci věnovanou komunitě. Zároveň je zavrhována všemi, kteří by ve svém uzavřeném programu rádi použili nějaký velice užitečný GPL kód, ale kvůli licenčním důvodům nemohou. Klasik by řekl, že o tom, zda je nakažlivost GPL licence správná nebo špatná, můžeme diskutovat, můžeme o tom vést spory, můžeme s tím i nesouhlasit, ale to je všechno, co se proti tomu dá dělat.</p>
+
+<p>Pod touto licencí je šířeno například jádro operačního systému Linux, OpenOffice.org a velká část software v GNU/Linux distribucích.</p>
+</li>
+
+<li><em>GNU Lesser General Public License (GNU LGPL), http://www.gnu.org/licenses/lgpl.html</em>
+<p>GNU LGPL je méně restriktivní variantou licence GNU GPL. Použití kódu pod touto licencí (resp. zkompilovaného do sdílené DLL knihovny a jejím použití) nezpůsobí žádnou nákazu. Při distribuci je pouze třeba informovat, že produkt používá danou LGPL knihovnu.</p>
+
+<p>Vhodnou strategií při používání GNU licencí se jeví soustředit co největší část obecně použitelného kódu do LGPL knihoven a tyto stavební kameny poté pospojovat do vlastního GPL programu.</p>
+</li>
+
+<li><em>Mozilla Public License (MPL), http://www.mozilla.org/MPL/</em>
+<p>MPL je dělící čárou mezi striktním GPL a volným BSD světem (viz dále). Zavádí licencování ne na úrovni výsledného binárního programu, ale na úrovni souborů se zdrojovým kódem. Pokud je daný soubor pod licencí MPL, musí se jeho veškeré úpravy zveřejnit, a také pokud se jeho část přenese do jiného souboru, musí být i on zveřejněn. Všechny ostatní části aplikace je možné šířit pod libovolnou - tedy i uzavřenou - licencí a výslednou aplikaci pod libovolnou licencí, pokud není v konfliktu s MPL.</p>
+
+<p>Licence se používá především v produktech Mozilla Foundation jako jsou například Mozilla Firefox nebo Mozilla Thunderbird.</p>
+</li>
+
+<li><em>Apache License, http://www.apache.org/licenses/</em>
+<p>Apache licence nevyžaduje, aby byl upravený produkt dále šířen pod tou samou licencí, jako je tomu u GPL. Definuje pouze, že v každém souboru musí zůstat originální hlavička s copyrightem a v každém změněném souboru musí být zmínka, že byl změněn. Soubor NOTICE z originálního produktu musí být beze změn překopírován i do distribuce odvozeného produktu.</p>
+
+<p>Licence se používá v produktech Apache Foundation, nejznámější aplikací je pravděpodobně webový server Apache. Spolu s GPL a LGPL je jednou z nejpoužívanějších open source licencí.</p>
+</li>
+
+<li><em>BSD License</em>
+<p>BSD license je jednou z nejvolnějších licencí vůbec, má jen několik málo snadno pochopitelných bodů. Při distribuci upraveného produktu požaduje uvést pouze informace o licenci, jméno autora a zřeknutí se odpovědnosti za chyby. Zdrojové kódy nemusí být zveřejněny. Je velice oblíbená komerčními firmami, například Apple založil svůj operační systém Mac OS X na základech unixového FreeBSD. Toto by v případě Linuxového jádra licencovaného pod GNU GPL bylo naprosto nemyslitelné, protože by musel zveřejnit veškeré zdrojové kódy celého operačního systému a všech jeho úprav.</p>
+</li>
+
+<li><em>Public domain</em>
+<p>Licencování pod public domain v principu znamená zřeknutí se autorských práv a veškerých nároků jakéhokoli druhu. Většinou se používá u referenčních implementací nově vytvořených algoritmů, kdy je autor dává široké veřejnosti k libovolnému použití.</p>
+</li>
+
+</ul>
+
+
+<h2>Proč otevřený software</h2>
+
+<p>Uveďme si místo šedé teorie dva příklady z praxe. Oba jsou na motivy skutečných událostí, jeden z oblasti uzavřeného software a druhý otevřeného.</p>
+
+<p>Řekněme, že při své práci naleznete spolu s kolegy závažnou chybu ve vámi používaném C++ kompilátoru, který za určitých okolností přeloží kód nesprávně, v rozporu s C++ standardem. Jeho autorem je jedna z největších softwarových společností světa a tento kompilátor je na dané platformě jednoznačně nejpoužívanějším. Máte ho samozřejmě legálně zakoupený a zákazník vašeho zaměstnavatele si dokonce připlácí za nadstandardní podporu.</p>
+
+<p>Objevenou chybu se všemi podrobnostmi nahlásíte a za nějaký čas obdržíte odpověď. Jedná se o interně známou chybu, podle oficiálních slov nikde nedokumentovanou, která se však nebude nikdy opravovat. Společnost by musela současně změnit i binární API svého operačního systému a existující aplikace by mohly přestat fungovat. I chyby musejí být zpětně kompatibilní!</p>
+
+<p>Dostali jste se do zajetí uzavřeného software, platíte za aplikaci i podporu, ale stejně je to k ničemu. Jediné řešení je chybu obejít workaroundem a doufat, že se nikde v ostatních částech vašich zdrojových kódů tato nepříliš standardní konstrukce neobjeví.</p>
+
+<p>Druhý příklad bude ze světa svobodných systémů. Ve své javovské aplikaci používáte Jython skriptovací vrstvu a jednoho dne naleznete v Jythonu bug. Nepříjemná situace, ale máte zdrojové kódy a nedá vám mnoho práce, abyste nalezli, co je špatně. Zjistíte, že se jedná spíše o vlastnost, jejíž chování může být za určitých okolností nejednoznačné, a v bugzille poprosíte o opravu. Následující den naleznete bug report zavřený a komentář: "It's a feature, it's documented in the user guide in the 'JavaBean Properties' section."</p>
+
+<p>Nebylo to v minulém příkladě úplně stejné?! Ne, ani svět svobodného software není ideální! Máte však zdrojové kódy Jythonu a máte možnost je upravovat. Zároveň víte, v čem chyba spočívá a kde se nachází... problém může být vyřešen tam, kde vznikl. Díky otevřené licenci nejste závislí na původních autorech a můžete jít vlastní cestou, pokud se vám ta jejich nelíbí. Toto je hlavní rozdíl mezi uzavřeným a otevřeným přístupem!</p>
+
+
+<h2>Vývoj přenositelného software</h2>
+
+<p>Jednou z charakteristických vlastností mnoha svobodných programů je přenositelnost mezi nejrůznějšími platformami a operačními systémy, <i>multiplatformnost</i>. Nemusí se jednat pouze o nejrozšířenější trojici GNU/Linux, Mac OS a MS Windows. Například dále popisovaná knihovna SDL používaná především pro tvorbu her podle dokumentace poskytuje oficiální podporu pro Linux, Windows, Windows CE, BeOS, MacOS, Mac OS X, FreeBSD, NetBSD, OpenBSD, BSD/OS, Solaris, IRIX a QNX a zároveň dokáže běžet - ovšem bez oficiální podpory - i na AmigaOS, Dreamcast, Atari, AIX, OSF/Tru64, RISC OS, SymbianOS a OS/2.</p>
+
+<p>O něčem podobném prakticky žádný uzavřený program nikdy ani nesnil. Co je příčinou tak obrovské přenositelnosti svobodného software? Začíná-li vyvíjet aplikaci komerční firma, které jde v první řadě o zisk, nebude přeci plýtvat penězi na vývoj pro minoritní platformy a soustředí se pouze na nejběžnější operační systémy. Pokud si uvědomíme, že MS Windows má už mnoho let větší než devadesáti procentní pokrytí trhu, není co řešit.</p>
+
+<p>Naproti tomu svobodný software píší <i>obyčejní lidé</i>, zkusme si opět vytvořit modelovou situaci. František by si rád zahrál Pavlovu chytlavou GPL hru, ale jeden používá GNU/Linux a druhý FreeBSD. Zkusí tedy požádat Pavla o portování na FreeBSD nebo to bez ptaní udělá sám - zdrojové kódy jsou přeci dostupné - a zašle mu výsledek své práce. Poté se objeví Petr, uživatel MS Windows, ale portování sem není tak jednoduché jako portování mezi dvěma operačními systémy unixového typu. Nicméně všechno se úspěšně podaří, navíc vznikl trojčlenný vývojářský tým a možná vznikla, pokud byli šikovní, i LGPL knihovnička pro psaní multiplatformních her. Jednou ji možná pojmenují SDL, Allegro nebo úplně jinak...</p>
+
+<p>Základem přenositelnosti aplikace je <i>abstrakce</i>. Pod MS Windows se například okno vytváří WinAPI funkcí <code>CreateWindowEx()</code>, v operačním systému GNU/Linux s X serverem funkcí <code>XCreateWindow()</code>, obě fungují pouze ve svém domovském prostředí a nikde jinde. Pokud aplikace nevolá tyto funkce přímo ale přes další vrstvu, může být ten samý aplikační kód beze změny použit úplně všude. Knihovna během linkování pouze vybere konkrétní implementaci vhodnou pro danou platformu. Ne, multiplatformní vývoj není nijak výrazně dražší, vývojář pouze volá místo nepřenositelného API funkce z přenositelné knihovny, která API plně obaluje. Cena je naprosto srovnatelná.</p>
+
+<center><img src="os_abstraction.svg" /></center>
+
+<p>Jaký je tedy správný přístup k vývoji přenositelných aplikací a her? V první řadě samozřejmě stojí naprosté zavržení API operačního systému a všech nepřenositelných funkcí, které poskytuje. Aplikace musí výhradně používat obalující abstraktní API, například již existující a mnohokrát ověřenou knihovnu SDL (viz dále) popřípadě taktéž multiplatformní C++ framework Qt. Možností je spousta, výběr je veliký.</p>
+
+<p>Dále je vhodné soustředit všechny konstanty - typicky cesty k souborům na disku - na jedno místo. Vždy se snažte zajistit, aby byla každá konstantní hodnota v programu definovaná právě jednou a měla za všech okolností právě jednu hodnotu. Ideálním se jeví odkudkoli přístupný singleton <code>Settings</code>, který si sám načítá konfiguraci a taktéž poskytuje do zdrojových kódů napevno zapsané konstanty a jejich dokumentaci.</p>
+
+<p>Praktické zkušenosti také říkají, že bývá efektivnější aplikaci vyvíjet pod některým z unixových operačních systémů a následně portovat do MS Windows než cesta v opačném směru. MS Windows je v principu úplně stejný jako ostatní operační systémy, ale nekompatibilní drobnosti dokáží častokrát překvapit. Kolikrát se už člověk podivoval nad chybami způsobenými rozdílnou velikostí písmen v názvech souborů, řešil naprosto nestandardní znakové sady, dvoubytové konce řádků v textových souborech nebo zpětná lomítka v diskových cestách.</p>
+
+<p>A konečně poslední rada. Při vývoji aplikaci pravidelně kompilujte pro všechna dostupná prostředí, v různých kompilátorech a samozřejmě si ji vždy zkuste spustit. Různé systémy detekují různé chyby. Některé hlídají neoprávněný přístup do paměti více než jiné (dynamický analyzátor <code>valgrind</code> také není špatný nápad) a některé neumožňují zapisovat uživatelům do souborů v systémových adresářích. Jiné občas vynulují nepoužívanou paměť, což se může projevit při přístupu k neinicializované proměnné, která má najednou náhodnou hodnotu.</p>
+
+<p>Dalo by se pokračovat do nekonečna, vše je o zkušenostech. Většinu hlavních zásad objevíte u svého prvního multiplatformního projektu, po určité době nad nimi přestanete přemýšlet a v tu samou chvíli vás přestanou zdržovat. Věta o tom, že přenositelný kód bývá většinou po všech stránkách mnohem lepší - tedy nejen svou přenositelností - teď už asi nikoho nepřekvapí, některé z důvodů byly uvedeny výše.</p>
+
+
+<h2>SDL a OpenGL</h2>
+
+<p>SDL, Simple DirectMedia Layer, je LGPL knihovna určená primárně pro tvorbu her a jiných multimediálních aplikací. Jeho hlavními výhodami jsou téměř dokonalá přenositelnost mezi nejrůznějšími operačními systémy, přehlednost a jednoduchost použití. Programátora nezahrnuje žádným gigantickým a složitým API, je relativně malé, ale přitom poskytuje vše, co je potřeba. Ve svém jádru obsahuje funkce především pro vytvoření okna, zpracování událostí, 2D grafiku, práci se zvuky, časovače a vícevláknové programování.</p>
+
+<p>SDL zvolilo cestu malého výkonného jádra a volitelných rozšiřujících knihoven, záleží na jednotlivých programátorech, pro které funkcionality se rozhodnou. Samotná knihovna například neumožňuje načítat jiné obrázky než BMP, nicméně rozšíření ve formě podknihovny SDL_image si poradí téměř s jakýmkoli formátem. Podobná situace panuje i se zvuky a dodatečnou knihovnou SDL_sound. Hlubokou nízkoúrovňovost v audio části, kde je programátor nucen pracovat s jednotlivými byty odesílanými na zvukovou kartu počítače, pohodlně vyřeší další z knihoven nazvaná SDL_mixer. S načítáním fontů a vykreslováním textu pomůže knihovna SDL_ttf a rozdělení aplikace na serverovou a klientskou část s přehledem vyřeší síťová knihovna SDL_net.</p>
+
+<p>2D grafika sice může být líbivá a přitažlivá, ale to pravé je jiště třetí rozměr. SDL je možné požádat, aby byla při vytváření okna zapnuta podpora OpenGL, což je standard pro renderování 3D grafiky. V MS Windows světě už sice v dnešní době vítězí DirectX, kdekoli jinde však neochvějně vládne bezkonkurenční OpenGL. Pro psaní přenositelných 3D her zůstává OpenGL jedinou rozumnou volbou podporovanou jak v knihovnách tak v operačních systémech a samozřejmě i v hardware grafických karet.</p>
+
+<p>O SDL i OpenGL by se daly napsat samostatné knihy, na tak malý prostor není možné vtěsnat nic víc než jen opravdu rychlý úvod. Cokoli konkrétnějšího by bylo příliš krátké na to, aby to mohlo být v něčem užitečné a pouze nezabíralo místo. Taktéž se nebudeme věnovat žádným jiným alternativám, jako je například Allegro nebo glut, snad stačil jeden příklad za všechny. Pokud vás tato problematika zaujala, doporučuji následovat v mnoha směrech vyčerpávající odkazy v referencích.</p>
+
+
+<h2>Portování existujícího software</h2>
+
+<p>Předtím, než začnete portovat již existující aplikaci, si vždy položte jednoduchou otázku. Nebylo by jednodušší všechno přepsat, než se snažit o složité portování s nejistým výsledkem? V naprosté většině případů, pokud se tedy nejedná o naprosto elementární aplikace, bude odpověď ano.</p>
+
+<p>Ačkoli vše možná na začátku vypadalo slibně, ve výsledku strávíte nad portováním ekvivalentní množství času jako při vývoji od znova, ale výsledek tomu nejspíš odpovídat nebude. Jednotlivé části programu budou maličko přiohnuté, sice pracující, ale špinavé, a do budoucna těžko rozšiřitelné. Pokud naopak zvolíte cestu všechno od základů přepsat, budete hned od začátku používat přenositelné knihovny, kopírovat existující kusy funkčního kódu a skládat je do sebe jako puzzle. Špatně napsaný kód přepíšete, protože mu už stejně nerozumíte a protože i při malé změně vstupních podmínek přestává fungovat. Kompletním přepsáním nejenže stvoříte něco mnohem lepšího, ale obecně celou aplikaci vyčistíte a dále s ní bude jen radost pracovat.</p>
+
+<p>Máte-li čas, přečtěte si knihu <i>Katedrála a tržiště</i> odkazovanou v referencích. V určité fázi dosavadní práci smazat a začít od znova je jedním z hlavních bodů pro vytvoření opravdu kvalitního programu. Budete stavět na nabytých zkušenostech a především co se týče architektury neuděláte podruhé ty samé chyby. Tato kniha byla hlavním impulzem pro přerod v té době již zkomírajícího uzavřeného prohlížeče Netscape Navigator v moderní Mozilla Firefox, který opět dobývá ztracené pozice.</p>
+
+<p>Počítačové hry mají oproti klasickým desktopovým aplikacím výhodu v tom, že obsahují pouze velice malé množství tlačítek, vstupních polí, dialogů a podobných prvků, které sice ve všech operačních systémech vypadají stejně, ale v jednotlivých API jsou velice rozdílné a prakticky neportovatelné. Ve hrách se většinou pouze otevře okno a celý rendering až do úrovně jednotlivých pixelů probíhá v režii aplikace. Pokud je logika oddělena od vykreslování, např. návrhovým vzorem <i>model-view-controller</i>, máte napůl vyhráno, bude stačit přepsat pouze jednu z částí a ostatní zůstanou bez větších změn. Událostní model, klávesnice, myš a další vstupní zařízení, bývají většinou portovatelné jedna ku jedné a nemusí být třeba dělat příliš mnoho změn. To samé platí pro práci se sítí (networking), která je mezi systémy také podobná.</p>
+
+<p>Opačnou cestou se stejným výsledkem je neportovat aplikaci ale API operačního systému a další používané knihovny. Například snahou projektu <i>Wine</i> je vytvořit alternativní implementaci WinAPI s primárním cílem spouštět nativní MS Windows aplikace na operačních systémech GNU/Linux, BSD, Mac OS X a Solarisu. Projekt je již hodně daleko, a proto je šance, že příkaz <code>wine program.exe</code> bude fungovat hned na první pokus. Pokud ne, možná pomůže upravení konfigurace Wine aplikaci na míru.</p>
+
+<p>Jedná-li se o váš program a máte-li jeho zdrojové kódy, můžete je zkusit nejdříve sestavit oproti <i>Winelib</i> knihovnám. Většina nastavších problémů bude pravděpodobně způsobena nekompatibilním chováním některých naportovaných funkcí. Nicméně jako autor aplikace naprosto přesně víte, proč byla která funkce volána a co přesně měla dělat, a proto by neměl být problém ji opravit přímo ve zdrojových kódech Wine. Výhody tohoto přístupu jsou zřejmé. Pomůžete nejen sobě a svému programu, ale i samotnému Wine. Vylepšíte jeho kompatibilitu s WinAPI originálem a komunitě poděkujete nejen slovy.</p>
+
+
+<h2>Závěr</h2>
+
+<p>V článku byly představeny principy, na kterých funguje vývoj otevřeného a svobodného software. Úvodní popis softwarových licencí, jež formovaly tento svět, přešel ve dvě modelové situace z oblastí otevřených a uzavřených systémů a jejich důsledky na praxi.</p>
+
+<p>Variabilita různých prostředí, především co se týče svobodných systémů, generuje požadavek na vytváření přenositelných aplikací. Bylo uvedeno několik hlavních zásad, jak takové aplikace vytvářet a na co je dobré si při této činnosti dávat pozor. Podtéma bylo zakončeno představením knihovny SDL pro vývoj multiplatformních her a taktéž standardu OpenGL pro rendering 3D grafiky.</p>
+
+<p>Na samém konci jsme se věnovali nelehkému úkolu portování programu na dosud nepodporovaný systém a přenášení MS Windows aplikací do unixových prostředí s využitím projektu Wine.</p>
+
+
+<h2>Reference</h2>
+
+<ul>
+<li><em>Various Licenses and Comments about Them</em><br />http://www.gnu.org/licenses/license-list.html</li>
+<li><em>Katedrála a tržiště, Eric S. Raymond</em><br />http://www.catb.org/~esr/writings/cathedral-bazaar/<br />http://www.root.cz/knihy/katedrala-a-trziste/</li>
+<li><em>Wine a Winelib</em><br />http://www.winehq.org/<br />http://www.winehq.org/docs/winelib-guide/index</li>
+<li><em>Knihovna SDL</em><br />http://www.libsdl.org/</li>
+<li><em>Seriál SDL: Hry nejen pro Linux</em><br />http://www.root.cz/serialy/sdl-hry-nejen-pro-linux/</li>
+<li><em>NeHe OpenGL Tutoriály</em><br />http://nehe.gamedev.net/<br />http://nehe.ceske-hry.cz/</li>
+</ul>
+
+
+</body>
+</html>

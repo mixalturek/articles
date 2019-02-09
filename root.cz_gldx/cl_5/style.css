@@ -1,0 +1,87 @@
+/*
+README:
+Nedávno jsem se rozhodl zaèít prohlí¾eè MS IE kompletnì ignorovat. Je extrémnì zastaralý, nepodporuje základní funkce a ze strany Microsoftu není znát snaha, ¾e by mìla vyjít nová verze (pravdìpodobnì se èeká na Win Longhorn, který má vyjít nìkdy kolem 2006). Pokud na rootu chcete mít i kompletní podporu IE, musíte trochu pøepisovat :-(
+*/
+
+body
+{
+	background-color: black;
+	color: #EEE;
+	margin: 0px;
+	margin-bottom: 50px;
+	font-family: "Arial CE","Helvetica CE","Verdana CE",Arial,Helvetica,Verdana,sans-serif;
+	font-size: 12pt;
+	text-align: justify;/* tohle byste na rootu taky mohli nastavit :-) */
+}
+
+#text_stranky
+{
+	background-color: rgb(51, 51, 51);
+	margin-left: 100px;
+	width: 450px;
+	padding: 5px;
+}
+
+#uvod
+{
+	background-color: rgb(68, 68, 68);
+	margin: 10px;
+	padding: 10px;
+	font-size: 10pt;
+	border: 1px outset gray;
+}
+
+span[title]/*klíèové slovo, nefunguje v IE (pravdìpodobnì)*/
+{
+	border-bottom: 1px dotted yellow;
+	cursor: help;
+}
+
+a[target='_blank']:after /*ikona u odkazù na cizí stránky, nefunguje v IE*/
+{
+	content: " "url(img/blank.gif);/*nefunguje v IE*/
+}
+
+h1
+{
+	padding: 0px;
+	margin: 0 0 20px 0;
+	font-size: 200%;
+	font-weight: bold;
+	text-align: center;
+}
+
+a, .m
+{
+	color: rgb(170, 200, 240);
+	text-decoration: none;
+}
+
+a:hover, .m:hover/*nefunguje v IE*/
+{
+	color: rgb(150, 175, 210);
+}
+
+i:before, i:after/*nefunguje v IE*/
+{
+	content: "\"";/*nefunguje v IE*/
+}
+
+pre
+{
+	font-size: 9pt;
+}
+
+.okolo_img
+{
+	text-align: center;
+	font-style: italic;
+}
+
+td
+{
+	text-align: center;
+	border: 1px solid gray;
+	padding-left: 10px;
+	padding-right: 10px;
+}

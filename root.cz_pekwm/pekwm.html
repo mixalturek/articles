@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<link href="data/ico.png" rel="shortcut icon" type="image/x-icon" />
+<title>PekWM</title>
+</head>
+
+<body>
+
+<h1>PekWM</h1>
+
+<p class="perex">Také vás zaráží rychlost gigantických správců pracovního prostředí typu KDE nebo Gnome? Což takhle zkusit PekWM, jeden z alternativních správců oken, který se vyznačuje pohodovým vzhledem, vysokou rychlostí a téměř absolutní konfigurovatelností?</p>
+
+<p>Když jsem viděl PekWM poprvé, nechápal jsem, jak může jít někdo cestou strohého správce oken o velikosti stovek kilobytů, když může používat komplexní správce pracovního prostředí obsahující nejrůznější vychytávky.</p>
+
+<p>Netrvalo dlouho a po roce a půl spokojeného používání jsem dal starému dobrému KDE sbohem a už skoro čtvrt roku jedu na PekWM. Popravdě, pochybuji, že bych se ještě kdy vracel zpět, a když, tak rozhodně ne k tomu &quot;přerostlému, pomalému a neustále bobtnajícímu&quot; KDE nebo jemu podobným...</p>
+
+
+<h2>První spuštění</h2>
+
+<p>Správce oken PekWM je, jak už bývá na GNU/Linuxu zvykem, šířen pod licencí GNU GPL. Už bylo řečeno, že je malý, extrémně rychlý a perfektně konfigurovatelný. Veškeré nastavení spočívá v editaci obyčejných textových souborů, jejichž počet by se dal spočítat na prstech jedné ruky.</p>
+
+<div class="img"><img src="./data/pekwm_logo.png" width="200" height="78" alt="" /><br />Logo PekWM</div>
+
+<p>Ponastavovat se dá v tomto správci oken v podstatě vše od klávesových zkratek, přes akce vyvolané kliknutím myši na specifické oblasti okna až po automatické spouštění aplikací po startu prostředí.</p>
+
+<p>Není problém nadefinovat, aby se například ICQ klient otevíral vždy vertikálně maximalizovaný v levém horním rohu na páté ploše. Po pravdě, především na těchto fičurkách stojí celý úspěch PekWM.</p>
+
+<p>Základní nastavení se dá zvládnout za odpoledne, dotvoření k obrazu svému pak během cca. jednoho týdne. Formát konfiguračních souborů PekWM je velice jednoduchý a pokud byste se i na něčem zasekli, určitě pomůže velice kvalitní <a href="http://adresh.com/pekwm/docs.html">dokumentace</a>.</p>
+
+<p>PekWM se dá stáhnout na své domovské stránce <a href="http://www.pekwm.org/">http://www.pekwm.org/</a>, u většiny běžných distribucí lze však nalézt i podobu balíčku. Jelikož je na výše uvedeném webu uvedena pouze nejnovější vývojová verze, která bohužel momentálně trpí několika neduhy (nefunkční grafická témata, bug při zavírání oken), doporučuji volit spíše druhou možnost. Pro jistotu dávám do downloadu (dole) zdrojové kódy od jedné ze starších verzí, kde vše funguje tak, jak má.</p>
+
+<p>Pokud se rozhodnete pro kompilaci ze zdrojových kódů, měli byste vystačit s trojicí ./configure, make, make install. Průběh konfigurace je navíc možné ovlivnit několika parametry, všechny možné volby lze získat pomocí ./configure --help.</p>
+
+<p>Aby se místo KDE, nebo čehokoli jiného, spouštělo PekWM, je nutné zapsat do souborů .xinitrc a .xsession příkaz exec pekwm. Najdete je ve svém domovském adresáři.</p>
+
+<pre>
+$ echo 'exec pekwm' > ~/.xinitrc
+$ echo 'exec pekwm' > ~/.xsession
+</pre>
+
+<p>Nefunguje? V display manažeru (dialog, ve kterém se po startu systému zadává uživatelské jméno a heslo) bude možná nutné pod položkou sezení navolit něco jako Implicitní sezení systému nebo Výchozí, pak by měly problémy zmizet.</p>
+
+<p>Když jsem spustil PekWM úplně poprvé, monitor zežloutl a já čekal a čekal a čekal... Asi po minutě mi došlo, že ta žlutá barva bez ničeho je všechno a nic dalšího už nebude ;-]. Startuje ani ne půl sekundy.</p>
+
+<div class="img"><a href="./data/default.png"><img src="./data/default_sm.png" width="200" height="150" alt="" /></a><br />PekWM při prvním spuštění</div>
+
+<p>Ze screenshotu výše jste jistě poznali, že se PekWM drží zásady 'méně je někdy více', a proto na ploše nezobrazuje, samozřejmě kromě barvy pozadí ;-) a případných menu, žádný grafický prvek. Pokud požadujete systémový panel, ikonky na ploše a podobné věci, vždy můžete použít externí programy - pár z nich bude popsáno i v tomto článku.</p>
+
+
+<h2>Konfigurace</h2>
+
+<p>Při prvním spuštění se v domovském adresáři uživatele vytvoří složka ~/.pekwm obsahující celkem šest textových souborů, které v sobě udržují veškerá nastavení.</p>
+
+<table>
+<tr><th>Soubor</th>			<th>Význam</th></tr>
+<tr><td>~/.pekwm/config</td>		<td>Základní nastavení</td></tr>
+<tr><td>~/.pekwm/menu</td>		<td>Menu</td></tr>
+<tr><td>~/.pekwm/keys</td>		<td>Klávesové zkratky</td></tr>
+<tr><td>~/.pekwm/mouse</td>		<td>Chování myši</td></tr>
+<tr><td>~/.pekwm/autoproperties</td>	<td>Definuje velikost oken, pozici, plochu apod. při spouštění aplikací</td></tr>
+<tr><td>~/.pekwm/start</td>		<td>Spouštění aplikací po startu PekWM</td></tr>
+</table>
+
+<p>Všechny konfigurační soubory, mají velice přehlednou strukturu, která se syntaxí vzdáleně podobá programovacímu jazyku C/C++. Jako ukázka je uvedena specifikace menu pro spouštění aplikací.</p>
+
+<pre>
+# Menu config for pekwm
+
+# Variables
+$TERM = "xterm -fn 9x15 +sb -bg black -fg white"
+
+RootMenu = "Pekwm"
+{
+  Entry = "term" { Actions = "Exec $TERM &amp;" }
+  Entry = "su" { Actions = "Exec $TERM -e su &amp;" }
+  Entry = "mc" { Actions = "Exec $TERM -title mc -e mc &amp;" }
+
+  Separator {}
+
+  Submenu = "Edit"
+  {
+    Entry = "KWrite" { Actions = "Exec kwrite &amp;" }
+    Entry = "Emacs" { Actions = "Exec $TERM -title emacs -e emacs -nw &amp;" }
+    Entry = "Vi" { Actions = "Exec $TERM -title vi -e vi &amp;" }
+  }
+
+  Submenu = "Net"
+  {
+    Entry = "Thunderbird" { Actions = "Exec mozilla-thunderbird &amp;" }
+    Entry = "Firefox" { Actions = "Exec firefox &amp;" }
+    Entry = "centericq" { Actions = "Exec $TERM -e centericq &amp;" }
+    Separator {}
+    Entry = "gFTP" { Actions = "Exec gftp &amp;" }
+
+// atd.
+</pre>
+
+<p>S ohledem na délku článku nebude popis konfiguračních souborů uveden, jejich formát je navíc patrný na první pohled. Pokud vzniknou nějaké komplikace (pravděpodobně u ~/.pekwm/autoproperties), vždy je možné nahlédnout do velice přehledné dokumentace. Pokud chcete, můžete si stáhnout <a href="./down/pekwm_woq.tar.gz">moje nastavení</a>.</p>
+
+
+<h2>Menu</h2>
+
+<p>PekWM disponuje celkem třemi menu, z nichž jedno je pevně dané, u druhého není třeba cokoli upravovat a třetí, pro spouštění aplikací, libovolně měnitelné. Poslední zmíněné se vyvolává kliknutím pravého tlačítka na plochu nebo častěji, většinou kvůli maximalizovaným oknům, na libovolný okraj obrazovky.</p>
+
+<div class="img"><img src="./data/root_menu.png" width="114" height="188" alt="" /><br />Menu pro spouštění aplikací</div>
+
+<p>Menu na přepínání aplikací se vyvolává podobně jako to minulé, používá se akorát tlačítka prostředního (většinou kolečko myši). Popravdě, nikdy jsem si na toto menu nezvykl, je to asi tím, že mám zapnuto relativně mnoho pracovních ploch, takže žádné okno nebývá skryté úplně celé.</p>
+
+<div class="img"><img src="./data/app_menu.png" width="301" height="141" alt="" /><br />Menu pro přepínání aplikací</div>
+
+<p>Poslední menu se vyvolává kliknutím pravého tlačítka myši na titulek okna. Obsahuje obvyklé příkazy, které snad není třeba popisovat. Dobrým nápadem vývojářů bylo přidání Kill (analogie xkill), které ukončuje aplikaci nereagující na uživatelské pokyny.</p>
+
+<div class="img"><img src="./data/win_menu.png" width="121" height="204" alt="" /><br />Okenní menu</div>
+
+
+<h2>Seskupování oken</h2>
+
+<p>Jednou z velice oblíbených funkčností PekWM je slučování oken do skupin. Funguje to tak, že se klikne prostředním tlačítkem myši na titulek okna a za současného držení se celé přetáhne na titulek jiného. Obě se následně budou chovat jako jediné.</p>
+
+<p>Tato technika je pravděpodobně nejvýkonnější spolu s autoproperties, mám např. nastaveno, aby se po otevření seskupovaly všechny KWrity maximalizované na třetí ploše. Výsledkem je, že nepotřebuji naprosto žádné klikátko na přepínání aplikací.</p>
+
+<div class="img"><img src="./data/groups.png" width="492" height="374" alt="" /><br />Slučování oken do skupin</div>
+
+
+<h2>Pracovní plochy</h2>
+
+<p>PekWM podporuje systém jak pracovních ploch, tak tzv. viewportů (ty jsou standardně vypnuté). Přepínat se mezi plochami dá hned několika způsoby. Já osobně asi nejčastěji používám klikání myší na levý/pravý okraj monitoru.</p>
+
+<p>Další z možností je podržení Win klávesy (mezi CTRL a ALT) a stisknutí čísla na alfanumerické klávesnici podle požadované plochy. Podobným způsobem lze i přesouvat okna, místo čísel se ale použijí funkční klávesy F1, F2 atd., samozřejmě funguje i obyčejné přetahování.</p>
+
+<p>K indikaci, na které ploše právě pracuji, používám prográmek <a href="http://onion.dynserv.net/~timo/index.php?page=Projects/netwmpager">netwmpager</a> zobrazený nad všemi okny v pravém dolním rohu obrazovky. V podstatě by se mohl použít i jakýkoli jiný pager, ale tento byl první, který bez problémů fungoval.</p>
+
+<div class="img"><img src="./data/netwmpager.png" width="160" height="94" alt="" /><br />netwmpager</div>
+
+<p>Mimochodem, moje standardní rozvržení aplikací na plochách je následující:</p>
+
+<table>
+<tr><th>Plocha</th>	<th>Program</th></tr>
+<tr><td>#1</td>		<td>xtermy (neseskupené)</td></tr>
+<tr><td>#2</td>		<td>mc, xtermy</td></tr>
+<tr><td>#3</td>		<td>KWrite, vi na úrovni pro běžnou práci ještě neumím ;-(</td></tr>
+<tr><td>#4</td>		<td>Firefox, Thunderbird, Opera</td></tr>
+<tr><td>#5</td>		<td>centericq</td></tr>
+<tr><td>#6</td>		<td>vše ostatní</td></tr>
+<tr><td>#7</td>		<td>většinou nevyužitá</td></tr>
+<tr><td>#8</td>		<td>OO.o aplikace</td></tr>
+</table>
+
+<p>Největší pohoda začíná po nastavení startu všech běžně používaných programů automaticky po spuštění systému (~/.pekwm/start), samozřejmě na správné ploše a o správných velikostech oken (~/.pekwm/autoproperties).</p>
+
+<p>Programy se pak ukončují spíše výjimečně, v podstatě nic se neminimalizuje ani nemaximalizuje, vše je přesně tak, jak má být. A když se i podaří něco omylem zavřít, po opětovném spuštění se to otevře na obvyklém místě. Kdo nevyzkoušel, nemá nikdy šanci pochopit, co dobrovolně nechává ležet ladem ;-)</p>
+
+
+<h2>Oblečky, skiny, témata</h2>
+
+<p>Jako snad každé pracovní prostředí dovoluje i PekWM měnit svůj vzhled. Pokud se vám standardní okna nelíbí, můžete si bez problémů <a href="http://hewphoria.com/?p=themes&cat=1">stáhnout jiné</a>, kutilové si pravděpodobně vytvoří oblečky vlastní - nejedná se o nic složitého, stačí mít grafické cítění.</p>
+
+<p>Veškerá činnost spočívá v nakreslení obrázků pro všechny části okna (okraje, rohy, tlačítka...), nalezení vhodných fontů a editaci jediného konfiguračního souboru.</p>
+
+
+<h2>Dokovatelné aplikace</h2>
+
+<p>Pokud bylo PekWM zkompilováno se zapnutou volbou --enable-harbour, je možné používat tzv. dokovatelné aplikace, které lze najít např. na <a href="http://www.dockapps.org/">http://www.dockapps.org/</a>, <a href="http://www.bensinclair.com/dockapp/">http://www.bensinclair.com/dockapp/</a> popř. vygooglovat.</p>
+
+<p>Jsou to malé prográmky, které se uchytí na některém z okrajů obrazovky a poskytují určité funkce, jako jsou hodiny, nejrůznější monitory vytížení systému, spouštěče a prostě vše co vás napadne.</p>
+
+<div class="img"><img src="./data/dockapps.png" width="68" height="204" alt="" /><br />Dokovatelné aplikace</div>
+
+
+<h2>Hlavní panel</h2>
+
+<p>Předpokládám, že mi ho s největší pravděpodobností obijete o hlavu, ale proč třeba nepoužít KDE Kicker? Do ~/.pekwm/start stačí přidat řádek, který ho automaticky spustí při startu, následně budete mít dostupných &quot;90% funkčnosti KDE o rychlosti PekWM&quot;.</p>
+
+<pre>
+# ~/.pekwm/start
+kicker &amp;
+</pre>
+
+
+<h2>Ikonky na ploše</h2>
+
+<p>Bohužel nemohu sloužit, nepoužívám. Co jsem narychlo googloval, docela slibně vypadá <a href="http://idesk.sourceforge.net/">iDesk</a> popř. <a href="http://rox.sourceforge.net/">ROX</a>, ale opravdu jsem nezkoušel.</p>
+
+
+<h2>Obrázek na ploše</h2>
+
+<p>Pro nastavení pozadí plochy existují tuny programů, například <a href="http://thegraveyard.org/hsetroot.php">hsetroot</a> funguje naprosto bez problémů.</p>
+
+<pre>
+# ~/.pekwm/start
+hsetroot -center ~/.pekwm/obrazek.jpg &amp;
+</pre>
+
+<div class="img"><a href="./data/woq.png"><img src="./data/woq_sm.png" width="200" height="150" alt="Moje PekWM" /></a><br />Moje PekWM</div>
+
+
+<h2>Odkazy</h2>
+
+<p><ul>
+<li><a href="http://www.pekwm.org/">Domovská stránka PekWM</a></li>
+<li><a href="http://hewphoria.com/?p=themes&cat=1">Témata PekWM</a></li>
+<li><a href="http://www.dockapps.org/">Dokovatelné aplikace</a> a <a href="http://www.bensinclair.com/dockapp/">ještě jedny</a></li>
+<li><a href="http://thegraveyard.org/hsetroot.php">hsetroot</a>, <a href="http://onion.dynserv.net/~timo/index.php?page=Projects/netwmpager">netwmpager</a>, <a href="http://idesk.sourceforge.net/">iDesk</a>, <a href="http://rox.sourceforge.net/">ROX</a></li>
+</ul></p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./down/pekwm-dev-20050227.tar.gz">PekWM</a> (jedna ze starších verzí, ve které jsou skiny ještě bez problémů)</li>
+<li><a href="./down/pekwmdocs.tar.gz">PekWM dokumentace</a></li>
+<li><a href="./down/pekwm_woq.tar.gz">Moje konfigurační soubory</a></li>
+<li><a href="./down/hsetroot-1.0.2.tar.gz">hsetroot</a></li>
+<li><a href="./down/netwmpager-1.6.tar.bz2">netwmpager</a></li>
+<li><a href="pekwm.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 20.08.2005</div>
+
+</body>
+</html>

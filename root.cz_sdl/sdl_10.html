@@ -1,0 +1,241 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (10)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (10)</h1>
+
+<p class="perex">Seriál se přehoupl do druhé desítky, příště už na počítání přestanou stačit prsty ;-). Ale ještě než se tak stane, probereme si komunikaci aplikace se správcem oken, což v sobě zahrnuje změnu titulku okna, minimalizaci, přepínání do/z fullscreenu a několik dalších věcí. Ke konci bude také přidán lehký úvod do zpracování událostí.</p>
+
+
+<h2>Správce oken</h2>
+
+<p>Knihovna SDL poskytuje několik příkazů, které zajišťují komunikaci mezi aplikací a správcem oken (Window Manager). Samozřejmě není možné komunikovat, neexistuje-li druhá strana - většinou se jedná o běh v textovém režimu, když není spuštěný X server. SDL toho po pravdě nepodporuje mnoho, v podstatě pouze změnu názvu a ikony v titulkovém pruhu, programovou minimalizaci okna a přepnutí do/z fullscreenu. Názvy funkce, které zajišťují tyto činnosti, začínají na předponu SDL_WM_.</p>
+
+
+<h2>Titulkový pruh</h2>
+
+<p>Začneme jednoduše, řetězec v titulku okna se změní funkcí SDL_WM_SetCaption(), ostatně tato funkce byla použita snad ve všech ukázkových příkladech, takže by se nemělo jednat o nic nového.</p>
+
+<pre>
+void SDL_WM_SetCaption(const char *title, const char *icon);
+void SDL_WM_GetCaption(char **title, char **icon);
+</pre>
+
+<p>První parametr je jasný, specifikuje se jím řetězec v titulku. Existenci druhého jsem však nikdy nepochopil. SDL dokumentace ho popisuje jako &quot;jméno ikony&quot; a ani hlavičkový soubor ani zdrojové kódy více informací bohužel neposkytují. Co si pod ním představit tedy opravdu netuším. Možná se jedná o &quot;textovou ikonu&quot;, pro správce oken, které grafické neumožňují, ale toto je pouze má neověřená spekulace. Každopádně, pokud se předá NULL, nic se nezkazí.</p>
+
+<p>Ikona aplikace se nastavuje funkcí SDL_WM_SetIcon(), která by měla být volána před SDL_SetVideoMode(). Co se týká rozměrů, jsou doporučovány klasické 32x32 pixelů velké ikony, neměly by s nimi být žádné problémy.</p>
+
+<pre>
+void SDL_WM_SetIcon(SDL_Surface *icon, Uint8 *mask);
+</pre>
+
+<p>První parametr představuje surface s ikonou a druhý je bitovou maskou pro průhledné části. Je-li předáno NULL, použije se klíčová barva surface a pokud ani ta není specifikována, bude ikona neprůhledná.</p>
+
+<p>Bity masky nastavené do jedničky specifikují zobrazované a nuly naopak průhledné pixely, řádky jdou od shora dolů a každý z nich se skládá z (šířka / 8) bytů, zaokrouhleno nahoru. Nejvýznamnější bit každého bytu reprezentuje nejlevější pixel.</p>
+
+<p>Typický příklad nastavení ikony okna, která nepoužívá průhlednost může vypadat například takto:</p>
+
+<pre>
+// Před SDL_SetVideoMode()
+SDL_Surface *icon = SDL_LoadBMP("./icon.bmp");
+if(icon != NULL)
+{
+	SDL_WM_SetIcon(icon, NULL);
+	SDL_FreeSurface(icon);
+}
+</pre>
+
+
+<h2>Minimalizace okna</h2>
+
+<p>Okno se dá programem minimalizovat voláním funkce SDL_WM_IconifyWindow(). Vrácená nula značí, že minimalizace buď není podporována, nebo ji správce oken odmítl provést. V případě, že se vše uskutečnilo v pořádku, obdrží aplikace zprávu SDL_APPACTIVE s parametrem označujícím ztrátu fokusu.</p>
+
+<pre>
+int SDL_WM_IconifyWindow(void);
+</pre>
+
+
+<h2>Přepnutí do/z fullscreenu</h2>
+
+<p>Pro přepnutí mezi oknem a fullscreenem stačí jediný řádek kódu. Tedy, abychom byli přesní, stačil by, pokud by nebyla funkce SDL_WM_ToggleFullScreen() podporována pouze v X11, v BeOSu je zatím pouze experimentálně.</p>
+
+<pre>
+int SDL_WM_ToggleFullScreen(SDL_Surface *surface);
+</pre>
+
+<p>Funkce vrací při úspěchu jedničku, jinak nulu, po jejím zavolání by se obsah okna neměl změnit. Pokud surface okna nevyžaduje zamykání při přístupu k pixelům, bude ukazatel obsahovat stejnou adresu paměti jako před voláním.</p>
+
+<p>Jak už bylo zmíněno, pokud program neběží pod X11, ale například v MS Windows, přepnutí mezi oknem a celoobrazovkovým režimem nelze provést. Nicméně..., jak ukazuje demonstrační příklad níže, není problém okno zrušit a následně ho znovu vytvořit s negovaným parametrem režimu.</p>
+
+<pre>
+#define WIN_WIDTH 640
+#define WIN_HEIGHT 480
+#define WIN_BPP 0
+
+// Globální proměnné
+SDL_Surface *g_screen;
+Uint32 g_win_flags = SDL_RESIZABLE|SDL_FULLSCREEN;
+
+// Přepíná mezi režimy okno/fullscreen
+bool ToggleFullscreen()
+{
+	if(g_win_flags &amp; SDL_FULLSCREEN)// Z fullscreenu do okna
+		g_win_flags &amp;= ~SDL_FULLSCREEN;
+	else// Z okna do fullscreenu
+		g_win_flags |= SDL_FULLSCREEN;
+
+	// Pokus o přepnutí, podporováno pouze v x11
+	if(SDL_WM_ToggleFullScreen(g_screen) == 0)
+	{
+		fprintf(stderr, "Unable to toggle fullscreen,"
+				"trying to recreate window\n");
+
+		SDL_FreeSurface(g_screen);
+		g_screen = SDL_SetVideoMode(WIN_WIDTH, WIN_HEIGHT,
+				WIN_BPP, g_win_flags);
+
+		if(g_screen == NULL)
+		{
+			fprintf(stderr, "Unable to recreate window: %s\n",
+					SDL_GetError());
+			return false;// Ukončí program
+		}
+
+#ifdef OPENGL_APLIKACE
+		// Reinicializace OpenGL (parametry, textury...),
+		// starý kontext už není dostupný
+		if(!InitGL())
+		{
+			fprintf(stderr, "Unable to reinitialize OpenGL\n");
+			return false;// Ukončí program
+		}
+
+		ResizeGLWindow();// Nastaví perspektivu
+#endif
+
+		Draw();// Překreslí scénu
+	}
+
+	return true;// OK
+}
+</pre>
+
+<p>Tato a jí podobné funkce se většinou volají v reakci na stisk nějaké klávesy, a protože se v tomto článku začínáme zabývat událostmi, příklad volání lze nalézt níže...</p>
+
+
+<h2>Způsob grabování vstupů</h2>
+
+<p>Následující funkce umožňuje nastavit způsob grabování vstupů klávesnice a myši.</p>
+
+<pre>
+SDL_GrabMode SDL_WM_GrabInput(SDL_GrabMode mode);
+</pre>
+
+<p>V případě, že je nastaveno SDL_GRAB_OFF (implicitní nastavení) budou se zprávy předávat oknu pouze tehdy, pokud je aktivní (má fokus). Naopak, je-li ve stavu SDL_GRAB_ON, myš nemůže opustit klientskou oblast okna a všechny vstupy klávesnice jsou předávány přímo oknu, čili nejsou interpretovány okenním manažerem. Poslední možný parametr SDL_GRAB_QUERY slouží k dotazu na aktuální stav.</p>
+
+
+<h2>Správa událostí</h2>
+
+<p>Komunikace mezi operačním systémem a SDL aplikací je vystavěna na tzv. událostním modelu. Vždy, když v systému nastane nějaká událost, například uživatel stiskne klávesu nebo pohne myší, generuje operační systém objekt dané události, nastaví jeho parametry (stisknutá klávesa, nová pozice myši) a předá ho aplikaci. Někdy se také říká, že operační systém poslal aplikaci zprávu o události. Ta na ni může zareagovat naprosto libovolným způsobem, včetně její ignorace.</p>
+
+<p>Povídání o událostech začneme praktickým příkladem jejich zpracování. V tuto chvíli nemusíte pochopit naprosto všechny detaily, pokud však vstřebáte základní principy, máte z 95 procent vyhráno, dále už se bude jednat jen o nabalování speciálních znalostí. No, a pokud následující příklad nepochopíte, tak to zkuste ještě jednou ;), od této chvíle se bez těchto věcí neobejdete.</p>
+
+<p>Bývá dobrým zvykem vložit veškerou práci s událostmi do specializované funkce. Definujeme, že vrácené false z ProcessEvent() říká hlavní smyčce programu, že je z nějakého důvodu nutné ukončit aplikaci. V tomto případě chce uživatel buď ukončit program, stisknul klávesu Escape, nebo se nezdařilo přepnutí mezi oknem a fullscreenem.</p>
+
+<p>Uvnitř funkce deklarujeme proměnnou typu SDL_Event, kterou budeme v cyklu naplňovat událostmi čekajícími ve frontě. Pokud je fronta prázdná, cyklus, a tedy i celá funkce se ukončí a řízení je předáno hlavní smyčce programu.</p>
+
+<pre>
+bool ProcessEvent()
+{
+	SDL_Event event;// Objekt události
+
+	while(SDL_PollEvent(&amp;event))
+	{
+</pre>
+
+<p>Rozvětvíme kód podle typu události a pokud se jedná o klávesnici, zanoříme se, v závislosti na typu klávesy, ještě více do hloubky. Ošetřen je pouze Escape ukončující aplikaci a F1, která způsobí přepnutí do/z fullscreenu.</p>
+
+<p>Mimochodem, názvy kláves lze najít v SDL dokumentaci téměř dole pod nadpisem &quot;SDL Keysym definitions&quot; nebo v hlavičkovém souboru SDL_keysym.h.</p>
+
+<pre>
+		switch(event.type)
+		{
+		// Klávesnice
+		case SDL_KEYDOWN:
+			switch(event.key.keysym.sym)
+			{
+			case SDLK_ESCAPE:
+				return false;
+				break;
+
+			case SDLK_F1:
+				if(!ToggleFullscreen())
+					return false;
+				break;
+
+			default:
+				break;
+			}
+			break;
+</pre>
+
+<p>V každé aplikaci by měl být ošetřen SDL_QUIT, tato událost nastane, když má být program ukončen. Uživatel například klikl na křížek v pravém horním rohu okna, stiskl ALT+F4, klikl pravým tlačítkem myši v hlavním panelu na aplikaci a zvolil Zavřít atd. Zareagujeme, jak se očekává, skončíme.</p>
+
+<pre>
+		// Požadavek na ukončení
+		case SDL_QUIT:
+			return false;
+			break;
+</pre>
+
+<p>Pro zachování jednoduchosti tento ukázkový kód ostatní události ignoruje.</p>
+
+<pre>
+		// Ostatní se ignorují
+		default:
+			break;
+		}
+	}
+
+	return true;
+}
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Úvod do událostí</h3>
+
+<p>Program tentokrát nic nevykresluje, na začátku je nastavena ikona a titulek okna a poté se hlídají události klávesnice. Pokud je stisknut ESC, aplikace se ukončí, v reakci na F1 se okno přepne do celoobrazovkého režimu nebo zpět, M okno minimalizuje a G změní způsob grabování vstupů (SDL_WM_GrabInput()). Pokud je stisknuta jiná klávesa, vypíše se její číslo a jméno. <a href="./src/sdl_10_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/10_prog_a.png" width="328" height="269" alt="Úvod do událostí" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_10_a.tar.gz">Příklad: Úvod do událostí</a></li>
+<li><a href="sdl_10.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se budeme především věnovat operacím s frontou událostí, naučíme se, jak z ní grabovat zprávy a naopak, jak je do ní vkládat.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 28.03.2005</div>
+
+</body>
+</html>

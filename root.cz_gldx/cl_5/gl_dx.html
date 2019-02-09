@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D V.</h1>
+
+<p id="uvod">V jednom z předchozích dílů jsme se věnovali programátorskému hledisku práce v našich dvou knihovnách. Na toto téma nyní navážeme jejich architekturou, se kterou souvisejí další výrazné výhody a nevýhody.</p>
+
+
+<h3>Architektura</h3>
+
+<p>Z dosavadního popisu je více než jasné, že se architektura OpenGL a Direct3D výrazně liší.</p>
+
+<div class="okolo_img"><img src="img/arch_gl.png" width="180" height="115" alt="Architektura OpenGL" /><br />Architektura OpenGL</div>
+
+<p>OpenGL představuje cca. 150 funkcí, s jejichž pomocí programátor komunikuje přímo s hardwarem karty. Pokud se v počítači 3D akcelerátor nenachází, mohou se všechny výpočty realizovat softwarově. Obecně se dá říci, že o tom, co se pošle hardwaru a co ne, rozhoduje výhradně implementace OpenGL (ten, kdo ji naprogramoval) a každá implementace pracuje jinak. Jedinou podmínkou však je, že se pro aplikaci musí navenek tvářit, že podporuje naprosto vše a předem definovaným způsobem.</p>
+
+<p>Téměř všechny změny v OpenGL (1.1, 1.2 atd.) spočívají v přidání extensionů, které už za dobu od svého uvedení podporuje naprostá většina běžně používaných karet, do &quot;základního standardu&quot;. Původně navržená koncepce tedy zůstává prakticky nezměněna. Kromě toho je vždy možné jakékoli HW funkce nových karet, které se nenachází v &quot;základním standardu&quot; používat přes extensiony.</p>
+
+<p>Jedinou nevýhodou rozšíření (a docela podstatnou) je jejich množství. Několik desítek by bylo ještě bez větších problémů, nicméně v současnosti začíná jejich počet u nových grafických karet dosahovat řádu stovek (odhaduji cca. 200) a stále roste. Druhou nevýhodou je, že naprostá většina z nich je málo popsaná. Samozřejmě myslím v češtině, anglicky mluvící (rozuměj čtoucí :-) programátoři větší problémy mít nebudou.</p>
+
+<p>Architektura Direct3D je oproti OpenGL, které leží přímo na hardwaru, o něco složitější. Aplikační vrstva (to, co píše programátor) komunikuje s vrstvou Direct3D, rozhraní je v tomto případě vždy jednotné a to, co se nachází ve standardu Direct3D dané verze, je vždy možno provést, přičemž nezáleží na tom, jestli je toho HW schopen. Poslední z vrstev, když nepočítáme <span title="Device Driver Interface - ovladače karty">DDI</span> (tzv. ovladače karty), je vrstva <span title="Hardware Abstraction Layer">HAL</span>, kterou dodává každý výrobce grafické karty a která defakto vrstvě Direct3D oznamuje: &quot;Ano, toto udělám na hardwaru, nestarej se o to.&quot;, respektive: &quot;Ne, toto hardware neumí, musíš to dopočítat softwarově.&quot; Obecně se dá říci, že vrstva Direct3D musí být schopna kompletně všechny efekty provést softwarově a teoreticky umět vykreslovat i bez jakékoli grafické karty v počítači.</p>
+
+<div class="okolo_img"><img src="img/arch_dx1.gif" width="200" height="248" alt="Aarchitektura Direct3D 9.0" /><br />Architektura Direct3D 9.0</div>
+
+<p>Abych pravdu řekl, jsem tak trochu na rozpacích, protože to, co jsem právě napsal vůbec nemusí být pravda - tedy celkový smysl je určitě správný, ale podrobnosti mohou být jinak. Zkrátka, tak tomu rozumím já, v DirectX opravdu neprogramuji.</p>
+
+<p>Vycházel jsem ze zdroje <a href="#literatura">[1]</a>. Zdroj <a href="#literatura">[3]</a> uvádí trochu odlišnou strukturu, ve které zkratka HAL neznamená &quot;Hardware Abstraction Layer&quot;, ale &quot;Hardware Activation Layer&quot;. Dále je přidána vrstva HEL (Hardware Emulation Layer), která filtruje vstupní funkce (to, co píše programátor) a rozhoduje, jestli je grafická karta umí provést nebo ne. V případě, že ne, vypočte se efekt softwarově pomocí této vrstvy, pokud ano, použije se HAL, která požádá hardware. Dále je přístupná i vrstva DirectDraw, kterou Direct3D používá pro mapování textur. Důvodem takto komplikované struktury je možnost aplikace manipulovat s ovladači a dotazovat se na to, co karta ve skutečnosti umí.</p>
+
+<div class="okolo_img"><img src="img/arch_dx2.png" width="183" height="117" alt="Jiná verze architektury Direct3D" /><br />Jiná verze architektury Direct3D</div>
+
+<p>Kdybych měl určit, která z těchto dvou verzí je správná, rozhodl bych se asi pro tu první. Především proto, že je to tištěná kniha a ne PDF dokument stáhnutý z internetu a že od verzí DX novějších (tuším) než 7 chybí podpora 2D grafiky (kniha je o verzi 9.0). DirectDraw bylo tehdy sloučeno s Direct3D a už jako takové neexistuje.</p>
+
+<p>Tak či tak, získal jsem zcela neplánovaný důkaz, že se po přechodu na novější verzi DirectX můžete začít učit spoustu věcí od znova. Opět podotýkám, že se OpenGL změnilo pouze minimálně...</p>
+
+<h3>Shrnutí architektury - výhody a nevýhody</h3>
+
+<p>Stručně a neodborně, jak tedy Direct3D pracuje? Jeho hlavní výhodou je, že lze všechny převratné funkce nových grafických karet spustit i na starých kartách, a to i přesto, že nic takového vůbec nepodporují. Direct3D nemá nic podobného OpenGL extensionům, proto aby udrželo krok, musí se neustále a co nejrychleji inovovat a přidávat do sebe nové vlastnosti.</p>
+
+<p>Na jednu stranu programátoři mají jistotu, že když nějakou extrémně novou funkci použijí, tak se provede i na starém hardwaru (softwarově), který v době svého vzniku neměl nejmenší tušení, že něco podobného bude kdy existovat. Na druhou stranu, při počítání většiny věcí na CPU, bude program tak pomalý, že to stejně nemá význam - hra (většinou se jedná o hry) bude prostě nehratelná.</p>
+
+<p>Osobně si nedokážu představit, že by na softwaru běžel např. vertex/fragment shader - označení FPS (počet snímků za sekundu) by jednoznačně ztratilo jakýkoli význam, spíše by se mohlo počítat za kolik minut/hodin se vykreslí jeden snímek. Nevím, jestli může DirectX programátor nějak zjistit, co karta podporuje (asi ano) a podle toho se rozhodnout, jestli použít efekt přes kompletní emulaci pomocí DirectX (efekt, jak by ho provedl HW), částečnou emulaci vlastním kódem (analogický efekt v horší/mizerné kvalitě) nebo daný efekt nepoužít - v OpenGL je tohle na denním pořádku - o všem rozhoduje programátor aplikace. Akorát, že kdyby chtěl OpenGL programátor použít kompletní softwarovou emulaci, jak ji dělá Direct3D, musel by si vše naprogramovat sám, což jak jistě uznáte, je prakticky neproveditelné... nicméně Microsoft to musí provádět v každé verzi Direct3D.</p>
+
+<p>Zmíněné architektury mají ve svém důsledku ještě jeden efekt. Když někdo implementuje OpenGL ve svém zařízení, má množinu funkcí, které budou fungovat hardwarově a množinu, kterou musí implementovat softwarově, aby byly pro aplikaci dostupné naprosto všechny funkce nacházející se v obecném standardu. V případě Direct3D, které si do sebe naváže ovladače karty, aby s nimi mohlo obousměrně komunikovat a zjišťovat si, co karta podporuje a co ne, se musí provádět náročné testy pro všechny karty, se kterými bude pracovat. U OpenGL toto odpadá.</p>
+
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

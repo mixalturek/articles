@@ -1,0 +1,36 @@
+body
+{
+	position: absolute;
+	top: 100px;
+	left: 20%;
+	width: 60%;
+	padding-bottom: 100px;
+
+	background-color: rgb(200,200,210);
+	font-family: Verdana, "Bitstream Vera Sans", Geneva, Arial, sans-serif;
+	font-size: 10pt;
+	text-align: justify;
+	line-height: 1.5em;
+}
+
+img { border: none; }
+pre { line-height: 1.2em; }
+table { line-height: 1.1em; }
+table, td, th { border: 1px solid gray; }
+li.vspace { margin-bottom: 1.2em; }
+.perex { font-style: italic; }
+.autor { text-align: right; }
+.img { text-align: center; font-style: italic; }
+.todo { color: red; font-weight: bold; }
+.todo:before { content: "TODO: "; }
+
+@media print
+{
+	body
+	{
+		margin: 0px;
+		width: 100%;
+		top: 0px;
+		left: 0px;
+	}
+}

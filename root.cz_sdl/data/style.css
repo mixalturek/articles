@@ -1,0 +1,34 @@
+body
+{
+	position: absolute;
+	left: 20%;
+	top: 100px;
+	width: 60%;
+	padding-bottom: 100px;
+
+	background-color: rgb(200,200,210);
+	font-family: Verdana, "Bitstream Vera Sans", Geneva, Arial, sans-serif;
+	font-size: 10pt;
+	text-align: justify;
+	line-height: 1.5em;
+}
+
+pre { line-height: 1.2em; }
+table { line-height: 1.1em; }
+li.vspace { margin-bottom: 1.2em; }
+.perex { font-style: italic; }
+.autor { text-align: right; }
+.img { text-align: center; }
+.todo { color: red; font-weight: bold; }
+.todo:before { content: "TODO: "; }
+
+@media print
+{
+	body
+	{
+		margin: 0px;
+		width: 100%;
+		top: 0px;
+		left: 0px;
+	}
+}

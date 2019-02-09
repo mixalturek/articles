@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (2)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (2)</h1>
+
+<p class="perex">V druhé části série si ukážeme, jak nainstalovat SDL a dále budou uvedeny &quot;step-by-step&quot; návody na vytvoření SDL projektů v gcc, MS Visual C++ a Dev-C++.</p>
+
+
+<h2>Instalace SDL</h2>
+
+<p>Jak už bylo zmíněno na konci minulého dílu, v Linuxových distribucích bývá SDL standardně přítomno, ale pravděpodobně bude nutné doinstalovat balíčky pro vývoj (devel). U jiných operačních systémů, při požadavku nejnovější verze, či ruční kompilaci lze stahovat z <a href="http://www.libsdl.org/download-1.2.php">download stránky</a> webu SDL.</p>
+
+<p>V Linuxu se instalace ze zdrojových kódů provádí klasicky pomocí ./configure; make; make install, ve Windows je nejjednodušší cestou vzít předkompilovanou dynamickou knihovnu SDL.dll a zkopírovat ji buď do adresáře C:\Windows\System32\, nebo ke každému vytvářenému projektu zvlášť. Ať už používáte jakýkoli operační systém, nikdy byste neměli zapomenout přiložit k vašemu projektu také informační soubor README-SDL.txt.</p>
+
+
+<h2>Ukázkový program</h2>
+
+<p>Vzhledem k tomu, že se při vytváření nového programu začíná vždy založením projektu, budeme tak postupovat i my. Na popis zdrojového kódu se však vzhledem k místu nedostane, vše bude probráno až v následujících dílech.</p>
+
+<p>Velice jednoduchý ukázkový program vytvoří prázdné okno a poté bude čekat na stisk klávesy ESC, tím se ukončí. Nic extra efektního, ale alespoň budeme mít kontrolu, že jsme SDL dokázali zprovoznit.</p>
+
+<div class="img"><img src="./data/02_prog.png" width="328" height="269" alt="Screenshot ukázkového programu" /></div>
+
+
+<h2>gcc</h2>
+
+<p>Pokud je SDL nainstalováno, měl by jít zdrojový kód zkompilovat například následovně</p>
+
+<pre>
+$ g++ -o sdl02 sdl_02.cpp `sdl-config --cflags --libs`
+</pre>
+
+<p>Výše uvedený příkaz sdl-config se nainstaloval automaticky se SDL a slouží především k určení cest k hlavičkovým souborům a knihovnám. Před vlastním spuštěním gcc bude obsah části ve zpětných apostrofech proveden shellem a nahrazen do výsledné formy (na mém systému)</p>
+
+<pre>
+$ g++ -o sdl02 sdl_02.cpp -I/usr/include/SDL -D_REENTRANT
+-L/usr/lib -lSDL -lpthread
+</pre>
+
+<p>Mimochodem, všechny volby sdl-config lze získat spuštěním bez parametrů</p>
+
+<pre>
+$ sdl-config
+Usage: sdl-config [--prefix[=DIR]] [--exec-prefix[=DIR]]
+[--version] [--cflags] [--libs] [--static-libs]
+</pre>
+
+
+<h2>Visual C++ (6.0)</h2>
+
+<p>Aby IDE vědělo, kde má hledat hlavičkové a knihovní (LIB) soubory, je nejprve nutné přidat v menu Tools -&gt; Options -&gt; Directories absolutní cesty k podadresářům include a lib z rozbaleného archivu SDL-devel-1.2.8-VC6.zip.</p>
+
+<p>Dále se vytvoří nový Win32 Application projekt popř. Win32 Console Application projekt, pokud je požadavkem i výstup do konzole. V menu Project -&gt; Settings -&gt; C/C++ -&gt; Code Generation se v listboxu Use run-time library navolí Debug Multithreaded DLL (pro Debug verzi programu) nebo Multithreaded DLL (pro Release verzi programu). Toto se musí vykonat u každého nově vytvářeného projektu, jinak jeho kód nepůjde zkompilovat.</p>
+
+<p>Zbývá přilinkovat knihovny SDL.lib a SDLmain.lib, to lze udělat buď přes nabídky ve vlastnostech projektu, nebo připsáním následujících dvou řádků ke kódu.</p>
+
+<pre>
+#pragma comment (lib, "SDL.lib")
+#pragma comment (lib, "SDLmain.lib")
+</pre>
+
+
+<h2>Bloodshed Dev-C++ (4.9.9.1)</h2>
+
+<p>Podobně jako u Visual C++ je nutné v menu Nástroje -&gt; Nastavení kompilátoru -&gt; Adresáře nastavit cesty k hlavičkových a knihovním souborům. Na tomto místě je nutné poznamenat, že devel archiv pro Visual C++ je v Dev-C++ nepoužitelný, pro něj slouží SDL-devel-1.2.8-mingw32.tar.gz. Dynamická knihovna SDL.dll je už ale samozřejmě společná.</p>
+
+<p>Po vytvoření konzolového projektu se v menu Projekt -&gt; Vlastnosti projektu -&gt; Parametry přidají knihovny -lmingw32, -lSDLmain a -lSDL (v tomto pořadí). V případě, že bude na konec seznamu přidáno i -mwindows, nebude se zároveň s aplikací zobrazovat konzolové okno.</p>
+
+
+<h2>Jiné operační systémy a kompilátory</h2>
+
+<p>K jiným operačním systémům ani vývojovým prostředím nemám bohužel v současné době přístup. Pokud v nich máte se zprovozněním SDL problémy, mohl by vám pomoci <a href="http://www.libsdl.org/faq.php">SDL FAQ</a> nebo klasicky <a href="http://www.google.com/">Google</a>. Také můžete zkusit diskuzi níže, třeba se najde někdo chytrý...</p>
+
+
+<h2>Makefile pro tyto články</h2>
+
+<p>Aby se nemuseli permoníci, co nosí pakety po síti, příliš namáhat, budou kompletní projekty pro všechna testovaná vývojová prostředí pouze u tohoto článku. V příštích dílech bude přikládán pouze jednoduchý ručně psaný Makefile, který může při více souborech se zdrojovými kódy hodně věcí zjednodušit. Celý program se pak zkompiluje pouze zapsáním jediného make do příkazové řádky. Vývojová prostředí obsahují funkci přidání souborů do projektu, takže u nich by se neměly vyskytnou žádné větší problémy.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="http://www.libsdl.org/download-1.2.php">SDL download stránka</a></li>
+<li><a href="./src/sdl_02.tar.gz">Ukázkový program a Makefile</a></li>
+<li><a href="./src/sdl_02.html">Ukázkový program s obarvenou syntaxí</a></li>
+<li><a href="./src/sdl_02_visual_cpp.tar.gz">MS Visual C++ 6.0 projekt</a></li>
+<li><a href="./src/sdl_02_dev_cpp.tar.gz">Bloodshed Dev-C++ 4.9.9.1 projekt</a></li>
+<li><a href="sdl_02.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se v první části článku seznámíme s konvecemi názvů SDL funkcí a SDL datovými typy a v druhé části se konečně začneme věnovat popisu knihovny z programátorského hlediska.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 09.02.2005</div>
+
+</body>
+</html>

@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D VII.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D VII.</h1>
+
+<p id="uvod">V posledním díle seriálu, abyste neřekli, že Direct3D kritizuji jen já sám, uvedu citaci jednoho (téměř profesionálního) vývojáře her, který narozdíl ode mě, má s DirectX spoustu praktických zkušeností a asi ví, o čem mluví. Dále se podíváme na projekt Fahrenheit a stručně si popíšeme, jak se portují Windows programy do jiných systémů.</p>
+
+
+<h3>Citace (ne)profesionála</h3>
+
+<p>Bernard Lidický, který vede jeden z nejstarších free-vývojových týmů v ČR - <a href="http://hippo.nipax.cz/" target="_blank">Hippo Games</a>, byl pro mě vždy programátorským a Linuxovým GURU. Právě on mě opravdu dostal k Linuxu - před tím to byly jen takové krátkodobé pokusy. Ale proč to sem píšu, před časem mi poslal článek o tvorbě počítačových her <a href="#literatura">[4]</a>. O DirectX v něm píše, cituji:</p>
+
+<i>
+<p>Důvody proč ne DirectX</p>
+
+<ul>
+<li>API se mi zdá příliš komplikované a zabere hodně času se naučit s ním pracovat.</li>
+<li>Je potřeba napsat hodně kódu, aby program vůbec něco dělal.</li>
+<li>API se často mění. A mění se tak, že není zpětně kompatibilní. Tedy nová verze znamená nové ponoření se do manuálů a přepisování programu. Je otázka, zda je vývoj opravdu tak rychlý, nebo je API tak nevhodně navržené, že se musí s každou novou verzí celé změnit.</li>
+<li>U verzí menších než 7 je <strong>lživá</strong> dokumentace. Nezapomenu, když jsem týden od rána do večera seděl u počítače a marně se snažil použít rotaci nebo poloprůhlednost. V manuálu k DX7 bylo pak pod čarou napsáno: Currently not implemented.</li>
+<li>U verzí novějších než 7 pro změnu chybí podpora 2D grafiky. Tedy i 2D hra potřebuje pro svůj běh 3D akceleraci, aby se hýbala rychle.</li>
+<li>Poslední (a pro mě zásadní, protože používám Linux) nevýhoda je dostupnost pouze na Windows. Může se stát, že jednoho krásného dne opustíte Windows a přestěhujete se do Linuxu. Hru Kulič jsem pod Linux přeportoval za 3 hodiny, ale u Bombiče napsaného v DirectX8 jsem to raději ani nezkoušel. Znamenalo by to kompletní přepsání programu.</li>
+</ul>
+
+<p>Možná výhoda je, že pro DirectX je hodně tutoriálů. Proč je jich hodně? Možná proto, že jsou potřeba, aby to normální programátoři pochopili.</p>
+</i>
+
+<p>Abyste si nemysleli, on tomu fakt rozumí... :-]</p>
+
+<div class="okolo_img"><a href="img/kulic2.png"><img src="img/n_kulic2.png" width="200" height="150" alt="Kulič 2 - final beta 0.005" /></a><br />Kulič 2 - final beta 0.005</div>
+
+<p>Linux i Windows verzi Kuliče, včetně zdrojových kódů, možno stáhnout na webu Hippo Games.</p>
+
+
+<h3>Fahrenheit</h3>
+
+<p>Pod tímto pojmem se skrývá projekt Microsoftu a SGI, který by spojil OpenGL a DirectX do jediného nového standardu. Pokud se chcete dočíst několik podrobností o jeho návrhu, odkazuji na <a href="#literatura">[3]</a>. Důvod, proč o něm nebudu psát, je ten, že byl ze strany Microsoftu vypovězen, a to z důvodu pomalosti vývoje u SGI. Osobně nedokáži posoudit, jestli jsem měl slovo &quot;vypovězen&quot; v minulé větě blíže specifikovat příslovci &quot;bohužel&quot; nebo &quot;naštěstí&quot;.</p>
+
+
+<h3>Jak se portují programy</h3>
+
+<p>Skončíme na začátku rychlým popisem problémů ohledně portace počítačových her a obecně jakýchkoli programů na jiné systémy, než pro které byly primárně vyvíjeny. Připomínám, že díky recenzi UT 2004 defakto vznikl celý tento článek.</p>
+
+<p>Obecně se dá říci, že pokud na něco takového, jako je přenositelnost programu, od samého začátku nemyslíte, bývá nejlepší cestou veškeré portování (ve smyslu složitých úprav zdrojových kódů) ignorovat a začít dělat na úplně jiném programu, kde s během na více systémech počítáte od začátku.</p>
+
+<p>Po svém přechodu z Windows na Linux jsem &quot;takovou blbost&quot;, jako je pokus o portaci, zkoušel u jediného programu, který však dosud denně používám při své práci. Jedná se o textovou aplikaci, které se při spuštění do parametrů main() předají jména C/C++ souborů a ona je označkuje do HTML. Při psaní tutoriálů o programování se nemusíte starat o formátování zdrojových kódů.</p>
+
+<p>Přestože se jednalo o jednoduchý program skládající se z jediné funkce, muselo se nejprve přepsat wokenní rozhraní do textu, ale s tím se samozřejmě muselo počítat. Dále se muselo odbourat rozhraní přes paměťově mapované soubory (soubor se chová jako obyčejné pole, o načítání dat, buffery ap. se stará Windows), přepsat veškeré znaky '\' v diskových cestách na '/', přepsat Windows typy proměnných (DWORD, LPCTSTR...) na céčkovské typy (unsigned int, const char * ...) atd. atd. atd. - práce na dvě hodiny (celý program zabral tři :-).</p>
+
+<p>Osobně si portaci jednou napsaného DirectX programu do OpenGL (nemyslím současný vývoj), aby mohl být spuštěn ve více systémech, naprosto nedokážu představit. A pokud by to už nějaký hyperaktivní programátor dělal, určitě nečekejte, že by po spuštění obě verze vypadaly stejně. Čím déle na portaci pracujete, tím více začínáte ignorovat podrobnosti typu: <i>Power upy nesvítí, kapky deště nejsou 3D a vrhané stíny se nerozmazávají podle vzdálenosti od světelného zdroje.</i></p>
+
+<p>Podrobnosti zkrátka přestanou být podstatné, smysl hry je zachován. Nicméně nazývat to jako lenost programátorů... dalo by se to tak sice říct, ale fakt nevím. Chtěl bych vidět, jak by vypadala vaše verze. Jedno však vím jistě - paření her a kritizování jejich programátorů je určitě jednodušší...</p>
+
+
+<h3>Mějte se...</h3>
+
+<p>Jelikož jsem už napsal o rozdílech mezi OpenGL a Direct3D prakticky všechno, čeho jsem schopen, náš seriál pomalu končí. Protože na rootu články o OpenGL vycházejí dlouhou dobu, tématu grafiky se už věnovat nebudu, ale možná, že se zde ještě někdy potkáme...</p>
+
+
+<h3>Verze pro tisk</h3>
+
+<p>Podobně, jako Pavel Tišnovský dává ke svým OpenGL tutoriálům verzi pro tisk, učiním tak i já. Celý seriál včetně všech obrázků v <a href="gl_dx_html.tar.gz">HTML (1,9 MB)</a> a <a href="gl_dx_pdf.tar.gz">PDF (1 MB)</a> verzi.</p>
+
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<h3>Další informace o OpenGL a DirectX</h3>
+
+<ul>
+<li>Články o OpenGL a spřízněných technologiích na root.cz</li>
+<li>Seriál o DirectX na Chip CD - vychází/vycházel (už neodebírám) hodně dlouho</li>
+<li><a href="http://nehe.opengl.cz/" target="_blank">http://nehe.opengl.cz/</a> - Rozsáhlý server o OpenGL (můj :-)</li>
+<li><a href="http://nehe.gamedev.net/" target="_blank">http://nehe.gamedev.net/</a> - To samé (a spousta věcí navíc) anglicky</li>
+<li><a href="http://www.opengl.org/" target="_blank">http://www.opengl.org/</a> - Domovská stránka OpenGL</li>
+<li><a href="http://www.microsoft.com/windows/directx" target="_blank">http://www.microsoft.com/windows/directx</a> - Domovská stránka DirectX</li>
+<li><a href="http://www.libsdl.org/" target="_blank">http://www.libsdl.org/</a> - SDL, knihovna pro vývoj přenositelných her</li>
+</ul>
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

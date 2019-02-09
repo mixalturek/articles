@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (23)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (23)</h1>
+
+<p class="perex">V dnešním, závěrečném, díle o knihovně SDL se pokusím shrnout všechny věci, na které jsem během psaní seriálu pozapomněl popř. kterým jsem se z důvodu mé neznalosti nevěnoval pozornost. Mimo jiné se budeme věnovat SDL_RWops, YUV video overlay, nahrávání sdílených knihoven za běhu aplikace a proměnným prostředí.</p>
+
+
+<h2>SDL_RWops</h2>
+
+<p>SDL_RWops je technika, kterou SDL poskytuje pro načítání obrázků a zvuků (obecně libovolných dat) z paměti namísto z diskových souborů.</p>
+
+<p>Pokud umíte používat např. některou z knihoven pro komprimaci, díky SDL_RWops je možné importovat obrázky z archivu úplně stejně, jako by byly uloženy přímo na disku. Nebo, jste-li schopni napojit aplikaci k vysílání internetového rádia, naprogramování přehrávače bude otázkou pouhé chvíle. Fantazii se meze opravdu nekladou.
+
+<p>Základní funkcí pro vytvoření SDL_RWops je SDL_RWFromFile(), která slouží pro práci s klasickými soubory. První parametr specifikuje diskovou cestu a druhý označuje mód otevření analogický parametru standardní funkce fopen() - "r" pro čtení, "w" pro zápis, atd.</p>
+
+<pre>
+SDL_RWops *SDL_RWFromFile(const char *file,
+			const char *mode);
+</pre>
+
+<p>Funkce SDL_RWFromFP() je analogií SDL_RWFromFile(), v prvním parametru přebírá namísto řetězce se jménem deskriptor otevřeného souboru. Pokud nebude druhý parametr nulový, SDL soubor po skončení práce automaticky uzavře.</p>
+
+<pre>
+SDL_RWops *SDL_RWFromFP(FILE *fp, int autoclose);
+</pre>
+
+<p>Pozn.: Dokumentace uvádí, že SDL_RWFromFP() není pod Win32 dostupná. Na této platformě údajně nemohou být soubory otevřené aplikací použity dynamicky linkovanou knihovnou.</p>
+
+<p>Jádrem SDL_RWops jsou funkce SDL_RWFromMem() a SDL_RWFromConstMem(), které vytvářejí SDL_RWops z dat uložených v paměti, resp. v konstantní paměti. Předává se jim ukazatel na tuto paměť a její velikost.</p>
+
+<pre>
+SDL_RWops *SDL_RWFromMem(void *mem, int size);
+SDL_RWops *SDL_RWFromConstMem(const void *mem, int size);
+</pre>
+
+<p>Funkce SDL_AllocRW() alokuje paměť pro prázdnou SDL_RWops strukturu a SDL_FreeRW() slouží pro její uvolnění. Používají se téměř výhradně při vytváření SDL_RWops z nějakého nestandardního zdroje. Všechna vnitřní data vráceného objektu se musí inicializovat manuálně, příklad je možné najít v dnešním ukázkovém programu, pracuje se v něm se ZIP archivem.</p>
+
+<pre>
+SDL_RWops *SDL_AllocRW(void);
+void SDL_FreeRW(SDL_RWops *context);
+</pre>
+
+<p>Struktura SDL_RWops obsahuje ve svém nitru atribut rozlišující typ obsahu a union ukládající data. Verze stdio slouží pro souborové SDL_RWops a mem pro paměťové. S poslední položkou, unknown, by se mělo operovat při uživatelské alokaci pomocí výše zmíněné funkce SDL_AllocRW().</p>
+
+<pre>
+typedef struct SDL_RWops
+{
+	Uint32 type;
+
+	union
+	{
+		struct
+		{
+			int autoclose;
+			FILE *fp;
+		} stdio;
+		struct
+		{
+			Uint8 *base;
+			Uint8 *here;
+			Uint8 *stop;
+		} mem;
+		struct
+		{
+			void *data1;
+		} unknown;
+	} hidden;
+
+	int (*read)(struct SDL_RWops *context, void *ptr, int size, int maxnum);
+	int (*write)(struct SDL_RWops *context, const void *ptr, int size, int num);
+	int (*seek)(struct SDL_RWops *context, int offset, int whence);
+	int (*close)(struct SDL_RWops *context);
+} SDL_RWops;
+</pre>
+
+<p>Poslední čtyři položky struktury jsou ukazatele na funkce, které poskytují přesuny na jiná místa v paměti, čtení, zápis a uvolnění dat. Nemusí se volat přímo, lze použít makra níže.</p>
+
+<pre>
+#define SDL_RWread(ctx, ptr, size, n)	(ctx)->read(ctx, ptr, size, n)
+#define SDL_RWwrite(ctx, ptr, size, n)	(ctx)->write(ctx, ptr, size, n)
+#define SDL_RWseek(ctx, offset, whence)	(ctx)->seek(ctx, offset, whence)
+#define SDL_RWtell(ctx)			(ctx)->seek(ctx, 0, SEEK_CUR)
+#define SDL_RWclose(ctx)		(ctx)->close(ctx)
+</pre>
+
+<p>Makra se chovají v podstatě stejně, jako standardní funkce ze stdio. Parametr ctx je ukazatel na SDL_RWops, ptr adresa bufferu, z/do kterého se čte/zapisuje, size počet bytů v bloku a n počet načítaných/zapisovaných bloků. Návratovou hodnotou je počet načtených/zapsaných bloků dat nebo -1 při chybě. Parametr whence ze SDL_RWseek() může nabývat konstant SEEK_SET, SEEK_CUR, SEEK_END.</p>
+
+<p>Jenom pro pořádek: poslední z maker, SDL_RWclose(), by mělo být zavoláno po skončení práce s libovolným SDL_RWops. Jedinou výjimkou jsou taková SDL_RWops, u kterých bylo požádáno o automatické uzavření.</p>
+
+<p>Otevřete-li si některý z hlavičkových souborů SDL, zjistíte, že v podstatě všechny funkce pracující se soubory představují pouze aliasy na načítání ze SDL_RWops. To samé platí pro rozšiřující knihovny, jako jsou SDL_image, SDL_sound, SDL_ttf a další. Například SDL_LoadBMP() je pouze souborová specializace SDL_LoadBMP_RW().</p>
+
+<pre>
+SDL_Surface *SDL_LoadBMP_RW(SDL_RWops *src, int freesrc);
+
+#define SDL_LoadBMP(file) \
+	SDL_LoadBMP_RW(SDL_RWFromFile(file, "rb"), 1)
+</pre>
+
+<p>Vypisovat seznam všech těchto funkcí je v podstatě zbytečné. Většinou by mělo stačit přidat ke jménu příponu '_RW' a místo řetězce se jménem předat ukazatel na SDL_RWops. Pokud nebude tato technika úspěšná, v některém z hlavičkových souborů lze vždy najít přesnou deklaraci.</p>
+
+<p>Než se se SDL_RWops úplně rozloučíme, nelze neuvést odkaz na <a href="http://www.kekkai.org/roger/sdl/rwops/rwops.html">tento výborný tutoriál</a> (anglicky).</p>
+
+
+<h2>YUV video overlay</h2>
+
+<p>YUV video overlay je grafická struktura, která poskytuje hardwaru přímý přístup do paměti obrázku. Zjednodušeně řečeno, místo, aby se při zobrazování všechny pixely zdlouhavě kopírovaly na určité místo na grafické kartě, program pouze oznámí jejich adresu v paměti a o nic dalšího se nestará. Mnohem vyšší rychlost předurčuje použití u přehrávání videa, jak je patrné už z názvu.</p>
+
+<pre>
+typedef struct
+{
+	Uint32 format;		// Formát
+	int w, h;		// Rozměry
+	int planes;		// Počet rovin (obyčejně 1 nebo 3)
+	Uint16 *pitches;	// Pole pitch
+	Uint8 **pixels;		// Pole ukazatelů na data pro každou rovinu
+	Uint32 hw_overlay:1;	// Hardwarově akcelerovaný?
+} SDL_Overlay;
+</pre>
+
+<p>Kromě pixelů jsou všechny položky pouze pro čtení, k těm se ale může přistupovat až po zamknutí struktury. Atribut format může nabývat následujících hodnot, více informací lze najít na <a href="http://www.webartz.com/fourcc/indexyuv.htm">této stránce</a>.</p>
+
+<pre>
+#define SDL_YV12_OVERLAY 0x32315659 // Planar mode: Y + V + U
+#define SDL_IYUV_OVERLAY 0x56555949 // Planar mode: Y + U + V
+#define SDL_YUY2_OVERLAY 0x32595559 // Packed mode: Y0+U0+Y1+V0
+#define SDL_UYVY_OVERLAY 0x59565955 // Packed mode: U0+Y0+V0+Y1
+#define SDL_YVYU_OVERLAY 0x55595659 // Packed mode: Y0+V0+Y1+U0
+</pre>
+
+<p>Overlay se vytváří funkcí SDL_CreateYUVOverlay(). Její parametry definují rozměry, formát a surface, na kterém bude zobrazen. Vzhledem k tomu, že je overlay vytvořen v hardwaru, bude při zobrazení oblast surfacu pod ním přepsána a její obsah není definován. Pro následné uvolnění slouží SDL_FreeYUVOverlay().</p>
+
+<pre>
+SDL_Overlay *SDL_CreateYUVOverlay(int width, int height,
+		Uint32 format, SDL_Surface *display);
+
+void SDL_FreeYUVOverlay(SDL_Overlay *overlay);
+</pre>
+
+<p>Při přímém přístupu k pixelům je vždy nutné overlay uzamknout.</p>
+
+<pre>
+int SDL_LockYUVOverlay(SDL_Overlay *overlay);
+void SDL_UnlockYUVOverlay(SDL_Overlay *overlay);
+</pre>
+
+<p>Overlay se zobrazuje funkcí SDL_DisplayYUVOverlay(), pozice a velikost cílové oblasti se specifikuje obdélníkem dstrect. Pokud bude mít overlay jinou velikost než cílová oblast, bude automaticky roztáhnut (max. 2x). Funkce vrací v případě úspěchu nulu.</p>
+
+<pre>
+int SDL_DisplayYUVOverlay(SDL_Overlay *overlay,
+			SDL_Rect *dstrect);
+</pre>
+
+<p>Pozn.: Z mého výkladu bylo asi poznat, že toho o overlay-ích moc nevím :-(. Něco málo informací, včetně několika odkazů, lze najít v <a href="http://www.root.cz/clanky/sdl-hry-nejen-pro-linux-8/nazory/vse/">diskuzi</a> k osmému dílu, kde se toto téma probíralo.</p>
+
+
+<h2>Little/big endian</h2>
+
+<p>Hlavičkový soubor SDL_endian.h deklaruje funkce pro práci s daty ve formátech little a big endian, tyto dva pojmy se vztahují k pořadí jednotlivých bytů ve vícebajtových proměnných. Na některých platformách se ukládají důležitější byty na nižší adresy a na jiných je tomu právě naopak. Vzhledem k tomu, že je SDL multiplatformní, a tedy dostupné na obou typech systémů, je přítomnost těchto funkcí naprosto zásadní.</p>
+
+<p>Aby mohla aplikace jednoduše zjistit, na kterém typu systému běží, poskytuje SDL symbolickou konstantu SDL_BYTEORDER, která může být nastavena buď na SDL_LIL_ENDIAN nebo na SDL_BIG_ENDIAN.</p>
+
+<p>Používáte-li pro načítání obrázků, zvuků a ostatních dat standardní SDL funkce, nemusíte se teoreticky o podobné záležitosti vůbec starat. Problémy však mohou nastat, pokud si píšete vlastní loadery. API je relativně jednoduché, a proto odkazuji zájemce, vzhledem k místu, na výše zmíněný hlavičkový soubor.</p>
+
+
+<h2>Proměnné prostředí</h2>
+
+<p>SDL poskytuje dvojici funkcí SDL_putenv() a SDL_getenv(), které umožňují zápis a čtení hodnot do/z proměnných prostředí. Při zápisu se předává řetězec ve formátu &quot;jméno=hodnota&quot;, čtení by mělo být jasné.</p>
+
+<pre>
+int SDL_putenv(const char *variable);
+#define putenv(X) SDL_putenv(X)
+
+char *SDL_getenv(const char *name);
+#define getenv(X) SDL_getenv(X)
+</pre>
+
+<p>V shellu je možné definovat proměnné určitých názvů, kterými lze změnit standardní chování SDL. V tomto seriálu jsme se už setkali se SDL_VIDEODRIVER a SDL_AUDIODRIVER specifikující video a audio ovladače, je jich však mnohem více. Podrobný seznam je možné najít v první sekci SDL dokumentace pod pojmem SDL_envvars.</p>
+
+
+<h2>Dynamické knihovny</h2>
+
+<p>Většinou se služby z externích knihoven poskytují aplikaci při překladu, v SDL je však možné zpřístupňovat knihovny i za běhu programu. Dynamická knihovna se nahrává funkcí SDL_LoadObject(), v jediném parametru se jí předává řetězec se jménem a cestou. Pro uvolnění slouží funkce SDL_UnloadObject().</p>
+
+<pre>
+void *SDL_LoadObject(const char *sofile);
+void SDL_UnloadObject(void *handle);
+</pre>
+
+<p>Ukazatel na funkci nacházející se ve sdílené knihovně je možné získat pomocí SDL_LoadFunction(). Parametry definují handle knihovny, ve které se má hledat, a řetězec se jménem funkce. Knihovna musí zůstat zavedená do paměti po celou dobu používání, pointer by přestal být validní.</p>
+
+<pre>
+void *SDL_LoadFunction(void *handle, const char *name);
+</pre>
+
+
+<h2>Informace o procesoru</h2>
+
+<p>A ještě bonus na závěr: Hlavičkový soubor SDL_cpuinfo.h obsahuje několik funkcí, kterými lze zjistit vlastnosti procesoru v počítači. Co která dělá si jistě domyslíte sami.</p>
+
+<pre>
+SDL_bool SDL_HasRDTSC();
+SDL_bool SDL_HasMMX();
+SDL_bool SDL_HasMMXExt();
+SDL_bool SDL_Has3DNow();
+SDL_bool SDL_Has3DNowExt();
+SDL_bool SDL_HasSSE();
+SDL_bool SDL_HasSSE2();
+SDL_bool SDL_HasAltiVec();
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Obrázky ze ZIP archivu</h3>
+
+<p>Program je modifikací ukázkového příkladu ze <a href="sdl_13.html">13. dílu</a>, obrázky se teď načítají pomocí SDL_RWops ze ZIP archivu, jinak žádná větší změna. Aby šel program zkompilovat, musí být v systému nainstalovaná knihovna <a href="http://zziplib.sourceforge.net/">zziplib</a>. Je šířena pod licencí GNU LGPL a pracuje pod několika operačními systémy včetně GNU/Linuxu a MS Windows. <a href="./src/sdl_23_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/23_prog_a.png" width="322" height="259" alt="Obrázky ze ZIP archivu" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_23_a.tar.gz">Příklad: Obrázky ze ZIP archivu</a></li>
+<li><a href="sdl_23.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Jak jsem zmínil na začátku, toto je poslední díl našeho seriálu o knihovně SDL. Popravdě zbyly ještě dvě témata, která jsem chtěl původně zařadit, ale už se jim věnovat nebudu.</p>
+
+<p>Prvním z nich je rozšiřující knihovna SDL_net pro implementaci síťových her. Bohužel jediné, co o ní v současné době vím, je to, že existuje - na komplexní článek docela málo.</p>
+
+<p>Druhým tématem měla být tvorba GUI. Pro SDL existuje hned několik knihoven na tvorbu tlačítek, editboxů a podobných věcí, většinu z nich lze najít v menu libraries na <a href="http://www.libsdl.org/">libsdl.org</a>. Další možností by mohlo být napojení SDL aplikace na GTK nebo QT, popř. minulý týden jsem objevil rychle se rozvíjející C++ knihovnu <a href="http://guichan.sourceforge.net/">Guichan</a> podporující SDL, Allegro a OpenGL (dohromady nebo zvlášť). I toto rozsáhlé téma ale nechávám na samostudium.</p>
+
+<p>No, zkusím redaktorům rootu navrhnout ještě jeden, opravdu závěrečný ;-], díl s obsahem a rejstříkem a pak se se seriálem o SDL konečně budeme moci rozloučit...</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 24.07.2005</div>
+
+</body>
+</html>

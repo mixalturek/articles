@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D I.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D I.</h1>
+
+<p id="uvod">Nedávno vyšel na root.cz článek <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a>. Jeho autor při popisu &quot;Technické stránky věci&quot; uvedl ne zcela šťastnou větu: <i>Bohužel je vidět, že v oblasti 3D grafiky se OpenGL nemůže DirectX v kvalitě obrazu rovnat.</i> a doplnil ji několika podrobnostmi. Pojďme se spolu podívat jestli je to pravda, nebo ten největší nesmysl, jaký kdy svět slyšel.</p>
+
+
+<h3>Úvod</h3>
+
+<p>V reakci na výše uvedený článek se vytvořila klasická &quot;náboženská válka&quot; typu <a href="http://www.microsoft.com/" target="_blank">MS Windows</a> proti <a href="http://www.linux.cz/" target="_blank">Linuxu</a>. Strany se rozdělily na OpenGL programátory a na osoby v každém druhém příspěvku prohlašující (ne všichni!): <i>Slyšel jsem...</i>, <i>Moc tomu nerozumím...</i>, <i>Nejsem expert...</i> a podobně. Ti druzí jmenovaní nějakým způsobem mimo jiné vygenerovali, že <a href="http://www.opengl.org/" target="_blank">OpenGL</a>, na rozdíl od <a href="http://www.microsoft.com/windows/directx" target="_blank">DirectX</a>, vytváří jeden člověk - s prominutím NEJVĚTŠÍ BLBOST, JAKOU JSEM KDY SLYŠEL. V průběhu článku vysvětlím proč, zatím jen tolik, že o tom, co se skrývá pod pojmem DirectX rozhoduje <strong>výhradně jediná firma</strong> (<a href="http://www.microsoft.com/" target="_blank">Microsoft</a>) a autorem OpenGL může být kdokoli, jehož implementace splňuje OpenGL standard a projde sérií testů. Dohled nad vývojem tohoto standardu má konsorcium <span title="Architecture Review Board">ARB</span>, do kterého patří firmy jako <span title="Silicon Graphics Inc.">SGI</span>, <span title="Digital Equipment Corporation">DEC</span>, <span title="Hawlett-Packard">HP</span>, IBM, Intel, Microsoft, Sun Microsystems a další.</p>
+
+
+<h3>Moje zkušenosti s 3D grafikou</h3>
+
+<p>Já také nejsem expert :-], i když mi někdy připadá, že mě za něj někteří lidé považují. S OpenGL jsem se poprvé (jako programátor) setkal léta páně 2002. Po půl roce jsem jako &quot;Vánoční dárek&quot; (to by bylo na dlouho) dostal doménu <a href="http://nehe.opengl.cz/" target="_blank">http://nehe.opengl.cz/</a> a byl mezi prvními, kteří o OpenGL začali psát v češtině (v současnosti vychází kvalitní seriály i na rootu). Tento web aktuálně obsahuje přes sto stránek o celkové velikosti cca. 2,8 MB (texty a skripty - ne <span title="Webový WYSIWYG editor">FrontPage</span> slátaniny). Témata jdou od absolutních základů po velmi pokročilé techniky. Jelikož jsem autorem/překladatelem cca. 70%, dá se říci, že OpenGL tak trochu rozumím... (Skrytou reklamu máme zdárně za sebou :-)<!-- Kdyžtak to umažte --></p>
+
+<div class="okolo_img"><img src="img/gl.jpg" width="220" height="108" alt="Logo OpenGL" /><br />Logo OpenGL</div>
+
+<p>Nicméně, horší to bude s DirectX částí, protože jsem o něm četl pouze jednu knihu <a href="#literatura">[1]</a>, která ale není zrovna kvalitní. Tímto nechci nikoho poškodit, radím pouze jako čtenář čtenáři. Úvod končí čtvrtou kapitolou na straně 115 a na zbylých 230 stranách se hojně využívá technika CTRL+C, CTRL+V. Výklad končí přibližně na úrovni <a href="http://nehe.opengl.cz/tut_10.php" target="_blank">desátého NeHe Tutoriálu</a>, takže nikde daleko. Celkově nezáživný manuálově/dokumentační styl psaní.</p>
+
+<p>Je mi jasné, že u DirectX části budu povětšinou, jak se říká, vařit z vody. S největší pravděpodobností neuvedu všechny jeho (ne:-)výhody, za což se předem omlouvám. Navrhoval bych proto, aby mě nějaký Direct-positive čtenář kontaktoval a předal mi nějaké praktické informace o DirectX, ty nemám žádné. Základní teorie mám dost z literatury. Potom bych mohl (případně bychom mohli společně) napsat další díl článku.</p>
+
+<div class="okolo_img"><img src="img/dx.gif" width="175" height="175" alt="Logo DirectX" /><br />Logo DirectX</div>
+
+
+<h3>Z historie</h3>
+
+<p>Na počátku osmdesátých let minulého století, v době, kdy výpočetní technice kraloval textový režim, se u společnosti <a href="http://www.sgi.com/" target="_blank">Silicon Graphics Inc. (SGI)</a> začaly vyvíjet grafické stanice a knihovna <span title="IRIX je unixový operační systém SGI počítačů">IRIS GL</span>, kterou lze považovat za přímého předka OpenGL. Jak šel vývoj dopředu, zbavovala se některých problematických rysů a dá se říct, že její poslední verze je s OpenGL téměř kompatibilní. Standard OpenGL vznikl na začátku devadesátých let (v <a href="#literatura">[3]</a> se uvádí rok 1992) a narozdíl od IRIS GL byl od počátku koncipován jako nezávislý na hardwaru, operačním systému a programovacím jazyce. Od té doby se změnil pouze minimálně, nejnovější verze je 1.5 a každý kdo dělá s OpenGL určitě ví, že se připravuje verze 2.0.</p>
+
+<p>V raných dobách OS Windows se hry vytvářely spíše pro <span title="Microsoft Disk Operating System">MS-DOS</span> (hledal jsem domovský web, ale nezabral ani Google...). Důvodem byla několikavrstvá struktura <span title="Windows Application Programming Interface - Windows aplikační programové rozhranní">Win API</span> a hlavně celková extrémní pomalost <span title="Graphic Device Interface - Windows programování grafiky">GDI</span>, které se pro větší projekty (rozuměj jakékoli projekty) naprosto nehodilo. Kdysi jsem v něm udělal několik 2D her, tím mé pokusy skončily - díky, ale už ne.</p>
+
+<p>Microsoft si byl problémů s GDI vědom, první pokus o jejich napravení se jmenoval WinG. Jednalo se o množinu funkcí, které umožňovaly přímý přístup do grafické paměti (do té doby to nešlo). Postupným vývojem vzniklo <span title="Game Software Development Kit - Sada nástrojů pro vývoj her">Game SDK</span>, které se za nějakou dobu přejmenovalo na DirectX.</p>
+
+<p>Jeho prvních několik verzí bylo prakticky téměř nepoužitelných (jako u mnoha dalších MS technologií), v současnosti jich existuje devět a jsou mezi sebou většinou nekompatibilní. To znamená, že pokud používáte DX5 a chcete přejít na DX6, musíte se vše začít učit od znova a všechen dosavadní kód upravit nebo dokonce kompletně přepsat (často bývá rychlejší). V současné době je DirectX ve verzi 9.0.</p>
+
+<p>Uvedením DirectX vyvolal Microsoft na jednu stranu pozitivní, na druhou negativní rozruch. (Windows) vývojáři her konečně dostali ucelený balík komponent - DirectDraw pro 2D grafiku, Direct3D pro 3D grafiku, DirectSound pro zvuky, DirectNet pro síťování atd. Nejdiskutovanější bylo právě Direct3D. Většina specialistů z oboru se shodovala na tom, že nevznikl žádný důvod k zavedení nového standardu. OpenGL plně postačovalo všem aplikacím a bylo prověřené časem. I když Direct3D disponuje prakticky stejnými funkcemi jako OpenGL, styl programování se naprosto liší.</p>
+
+<p>Dále už budeme porovnávat pouze OpenGL a Direct3D, protože určitě chápete, že srovnávat 3D grafiku např. se zvuky nebo síťováním dost dobře nejde :-)</p>
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

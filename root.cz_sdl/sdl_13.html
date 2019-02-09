@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (13)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (13)</h1>
+
+<p class="perex">Na řadě je další vstupní zařízení, tentokrát se jedná o myš. Opět se budeme věnovat, jak událostem, tak přímému přístupu.</p>
+
+
+<h2>Stisk tlačítka myši</h2>
+
+<p>Vždy, když uživatel stiskne některé tlačítko myši, vygeneruje SDL dvě události - SDL_MOUSEBUTTONDOWN a SDL_MOUSEBUTTONUP. První z nich je odeslána při stisku a druhá při uvolnění. V obou případech se podrobnosti o události hledají v podobjektu event.button, který byl odvozen ze struktury SDL_MouseButtonEvent.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 button;
+	Uint8 state;
+	Uint16 x, y;
+} SDL_MouseButtonEvent;
+</pre>
+
+<p>Atribut type je klasicky nastaven na jméno události a proměnná button ukládá jméno tlačítka, což je jedna ze symbolických konstant SDL_BUTTON_LEFT, SDL_BUTTON_MIDDLE a SDL_BUTTON_RIGHT. Ve verzi 1.2.5 SDL dále přibyla jména SDL_BUTTON_WHEELUP a SDL_BUTTON_WHEELDOWN, jenž oznamují točení rolovacím kolečkem nahoru a dolů.</p>
+
+<p>Stejně jako u klávesnice, i zde může být state nastaveno na SDL_PRESSED nebo SDL_RELEASED, tuto informaci však už máme k dispozici z parametru type. Proměnné x a y poskytují pozici myši v klientské oblasti okna při stisku, bod [0, 0] se nachází v levém horním rohu.</p>
+
+<p>V následujícím příkladu program zachytává stisk levého tlačítka myši a jako reakci vypíše do konzole informaci o pozici v okně.</p>
+
+<pre>
+// Ošetření událostí
+case SDL_MOUSEBUTTONDOWN:
+	switch(event.button.button)
+	{
+	case SDL_BUTTON_LEFT:
+		printf("BUTTON_LEFT - pos(%d,%d)\n",
+				event.button.x,
+				event.button.y);
+		fflush(stdout);
+		break;
+
+	default:
+		break;
+	}
+	break;
+</pre>
+
+<p>Výstup programu po dvou stisknutích levého tlačítka:</p>
+
+<pre>
+BUTTON_LEFT - pos(65,103)
+BUTTON_LEFT - pos(91,104)
+</pre>
+
+
+<h2>Událost pohybu myší</h2>
+
+<p>Pohyb myší oznamuje SDL zprávou SDL_MOUSEMOTION, podrobnosti se následně hledají v objektu event.motion odvozeného od SDL_MouseMotionEvent.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 state;
+	Uint16 x, y;
+	Sint16 xrel, yrel;
+} SDL_MouseMotionEvent;
+</pre>
+
+<p>Proměnná state definuje stavy tlačítek při pohybu. Pro zjištění, které je stisknuté a které ne, může být výhodné použít makro SDL_BUTTON(). Parametry x a y specifikují pozici kurzoru myši v okně, xrel a yrel obsahují relativní hodnotu posunu.</p>
+
+<p>Po příchodu události o pohybu myši v příkladu níže, vypíše program absolutní polohu kurzoru v okně, změnu polohy od minula a případně informaci o stisku tlačítek.</p>
+
+<pre>
+// Ošetření událostí
+case SDL_MOUSEMOTION:
+	printf("MOUSEMOTION - pos(%d,%d), relpos(%d,%d)%s%s%s\n",
+		event.motion.x, event.motion.y,
+		event.motion.xrel, event.motion.yrel,
+		(event.motion.state &amp; SDL_BUTTON(SDL_BUTTON_LEFT))
+				? ", left" : "",
+		(event.motion.state &amp; SDL_BUTTON(SDL_BUTTON_MIDDLE))
+				? ", middle" : "",
+		(event.motion.state &amp; SDL_BUTTON(SDL_BUTTON_RIGHT))
+				? ", right" : "");
+	fflush(stdout);
+	break;
+</pre>
+
+<p>Pokud je program spuštěn, začnou se při pohybování myší generovat výpisy podobné následujícím.</p>
+
+<pre>
+MOUSEMOTION - pos(130,91), relpos(4,0)
+MOUSEMOTION - pos(134,91), relpos(4,0)
+MOUSEMOTION - pos(138,91), relpos(4,0)
+MOUSEMOTION - pos(136,91), relpos(-2,0), left
+MOUSEMOTION - pos(132,93), relpos(-4,2), left, right
+MOUSEMOTION - pos(130,93), relpos(-2,0), left, right
+MOUSEMOTION - pos(128,95), relpos(-2,2), left, right
+</pre>
+
+
+<h2>&quot;Přímý&quot; přístup k myši</h2>
+
+<p>Stejně jako u klávesnice, i u myši je možné používat metody přímého přístupu. Lze se tedy kdekoli v programu dotázat na aktuální polohu kurzoru nebo stisk tlačítek.</p>
+
+<pre>
+Uint8 SDL_GetMouseState(int *x, int *y);
+</pre>
+
+<p>Tato funkce uloží na adresu ukazatelů v parametrech aktuální polohu myši v okně a vrátí bitové pole tlačítkových flagů. Pro rozlišení, které je stisknuté a které ne, je opět nejjednodušší použít bitový součin s makrem SDL_BUTTON(). Pokud nás zajímají pouze tlačítka, je možné předat do parametrů hodnoty NULL.</p>
+
+<p>Před samotným přístupem k myši bývá vhodné zavolat funkci SDL_PumpEvents(), která aktualizuje informace v SDL.</p>
+
+<p>Podobným způsobem se lze dotazovat i na relativní změny polohy od minulého volání této funkce nebo od zpracování události o pohybu myši.</p>
+
+<pre>
+Uint8 SDL_GetRelativeMouseState(int *x, int *y);
+</pre>
+
+<p>Do proměnných x a y bude v příkladu níže uložena aktuální poloha myši, kód v sekci if se provede jen tehdy, je-li stisknuto levé tlačítko.</p>
+
+<pre>
+// Kdekoli v programu
+int x, y;
+
+SDL_PumpEvents();
+if(SDL_GetMouseState(&amp;x, &amp;y) &amp; SDL_BUTTON(SDL_BUTTON_LEFT))
+	printf("Levé tlačítko na %d, %d.\n", x, y);
+</pre>
+
+
+<h2>Ruční změna polohy myši</h2>
+
+<p>Novou polohu myši lze specifikovat voláním funkce SDL_WarpMouse(), do parametrů se předávají požadované x a y souřadnice.</p>
+
+<pre>
+void SDL_WarpMouse(Uint16 x, Uint16 y);
+</pre>
+
+<p>Tato funkce má jeden vedlejší efekt, způsobuje generování události SDL_MOUSEMOTION, což může být někdy, kvůli zacyklení, nežádoucí (v reakci na událost se ošetří změna polohy a myš se přesune na nové místo, tím se generuje další událost, která se opět ošetří, myš se přesune atd.). Asi nejjednodušší řešení spočívá v ignorování této &quot;přebytečné&quot; události.</p>
+
+<p>Při změnách natočení kamery ve 3D akčních hrách končí ošetření každého pohybu myši nastavením její polohy zpět na střed okna. Je to z důvodu, že kdyby opustila okno, mohlo by ztratit fokus (většinou po kliknutí na jiné okno při střelbě) a operační systém by v takovém případě přestal posílat zprávy. Hra by se každou chvíli stávala nehratelnou.</p>
+
+<p>Implementace rotace kamery v závislosti na pohybech myši by mohla vypadat následovně.</p>
+
+<pre>
+// Ošetření událostí
+case SDL_MOUSEMOTION:
+	// SDL_WarpMouse() generuje SDL_MOUSEMOTION,
+	// bez testu na střed okna by se aplikace zacyklila
+	if(event.motion.x != GetWinWidth() >> 1
+		|| event.motion.y != GetWinHeight() >> 1)
+	{
+		m_cam.Rotate(event.motion.xrel,
+			event.motion.yrel, GetFPS());
+
+		// Přesun zpět doprostřed okna
+		SDL_WarpMouse(GetWinWidth() >> 1,
+			GetWinHeight() >> 1);
+	}
+	break;
+</pre>
+
+<p>Všimněte si především ignorování událostí, které generuje funkce SDL_WarpMouse(). Mimochodem, tento kód jsme použili v příkladu Pohyb v mřížce z <a href="sdl_08.html">osmého dílu</a>. Jedná se o metodu QGridApp::ProcessEvent(SDL_Event&amp; event).</p>
+
+<p>Další možností by mohl být zákaz pro myš opustit okno aplikace, zbavili bychom se tak neustálého měnění její polohy a následného rozlišování validity událostí. V SDL stačí zavolat funkci SDL_WM_GrabInput() s parametrem SDL_GRAB_ON (popsána v <a href="sdl_10.html">desátém dílu</a>), v některých jiných knihovnách však takové vymoženosti nejsou.</p>
+
+
+<h2>Barevné kurzory</h2>
+
+<p>Ještě jedna specialitka na závěr. V <a href="sdl_07.html">sedmém dílu</a> jsme si ukázali, jak požádat SDL, aby změnilo kurzor myši ze standardní šipky na jiný. Tato technika však měla tu nevýhodu, že kurzor mohl být pouze černobílý.</p>
+
+<p>V tuto chvíli však už máme dostatek znalostí, abychom standardní kurzor myši vypnuli a vykreslovali si vlastní, na nějž už nejsou kladena žádná omezení.</p>
+
+<pre>
+// Pro vycentrování obrázku na aktivní bod kurzoru
+// U šipek levý horní roh, u zaměřovačů střed, apod.
+#define POSUN_DOLEVA 0
+#define POSUN_NAHORU 0
+
+// Inicializace, skryje kurzor
+SDL_ShowCursor(0);
+
+// Vykreslování (kurzor by se měl vždy kreslit jako poslední)
+SDL_Rect rect;
+
+SDL_GetMouseState(&amp;rect.x, &amp;rect.y);
+rect.x -= POSUN_DOLEVA;
+rect.y -= POSUN_NAHORU;
+
+SDL_BlitSurface(g_cur_press, NULL, g_screen, &amp;rect);
+</pre>
+
+<p>Tento kód předpokládá, že se scéna periodicky překresluje, nejlépe v &quot;klasické&quot; herní smyčce nebo v reakci na pohyb myši a pokaždé se kreslí úplně všechno.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Kostky</h3>
+
+<p>Program zobrazuje v dolní části okna spoustu kostiček, které lze kliknutím myši zachytit a následně s nimi pohybovat. Jsou implementovány i kolize a také vlastní barevný kurzor, jenž se po kliknutí na nějakou kostku změní na jiný. <a href="./src/sdl_13_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/13_prog_a.png" width="322" height="259" alt="Kostky" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_13_a.tar.gz">Příklad: Kostky</a></li>
+<li><a href="sdl_13.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Minule klávesnice, teď myš, takže přístě bude na řadě joystick...</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 24.04.2005</div>
+
+</body>
+</html>

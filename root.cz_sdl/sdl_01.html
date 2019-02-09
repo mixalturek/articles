@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (1)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (1)</h1>
+
+<p class="perex">V této sérii článků se vám představí knihovna SDL, která slouží pro vývoj her a multimediálních programů, její největší předností je možnost zkompilovat zdrojový kód pro všechny běžně používané operační systémy. Ukázkové programy budou napsány v jazyku C/C++ a zkompilovatelné minimálně pod operačními systémy GNU/Linux a MS Windows.</p>
+
+
+<h2>Základní informace o SDL</h2>
+
+<p>Počátky knihovny <a href="http://www.libsdl.org/">Simple DirectMedia Layer</a> (SDL) ukazují ke společnosti <a href="http://www.lokigames.com/">Loki Entertainment Software</a>, která se zabývá portováním her do operačního systému GNU/Linux, a jejímu hlavnímu programátoru Samu Lantingovi. Byla navržena jako obecné nízkoúrovňové API (aplikační programové rozhraní) pro tvorbu her a obecně multimediálních aplikací. Z velké části zastřešuje funkce operačních systémů, a tím umožňuje téměř stoprocentní přenositelnost zdrojového kódu. Současná nejnovější stabilní verze je 1.2.8.</p>
+
+<div class="img"><img src="./data/01_sdl_logo.png" width="250" height="150" alt="Logo SDL" /></div>
+
+<p>SDL obsahuje funkce pro vytvoření okna (včetně fullscreenu) a správu událostí. Dvourozměrná grafika je zahrnuta přímo, 3D grafika je realizována pomocí OpenGL, které má přímou podporu. SDL dále umožňuje práci s audiem, CD-ROM a časovači, pokročilejší programátory jistě potěší podpora vícevláknového programování.</p>
+
+<p>Jak už plyne z názvu (Simple...), je tato knihovna relativně malá. V jádru obsahuje pouze základní funkcionalitu, díky čemuž je přehledná a nezahrnuje programátora žádným gigantickým API. Vše &quot;navíc&quot; poskytují různé nadstavby, např. SDL_image pro nahrávání obrázků (samotné SDL umí nahrát pouze formát BMP), SDL_sound a SDL_mixer pro zvuky, SDL_ttf pro truetype fonty, SDL_net pro síťování a další. V nejhorším případě musí programátor vše potřebné dotvořit sám, nicméně v naprosté většině případů už to někdo řešil před ním, stačí hledat.</p>
+
+
+<h2>Operační systémy a programovací jazyky</h2>
+
+<p>V součanosti je SDL portováno do operačních systémů GNU/Linux, MS Windows, BeOS, MacOS Classic, MacOS X, FreeBSD, OpenBSD, BSD/OS, Solaris, IRIX, a QNX. Dále je ho možno najít na Windows CE, AmigaOS, Dreamcast, Atari, NetBSD, AIX, OSF/Tru64 a SymbianOS, ale tyto systémy zatím nejsou oficiálně podporovány.</p>
+
+<p>SDL je napsáno v jazyce C a samozřejmě funguje i v C++. Může být však používáno i v dalších jazycích. Jsou jimi Ada, C#, Eiffel, Erlang, Euphoria, Guile, Java, Lisp, Lua, ML, Objective C, Pascal, Perl, PHP, Pike, Pliant, Python a Ruby. Všechny příklady v tomto seriálu budou napsány v jazyce C nebo C++. Pokud vás zajímají jiné, odkazy na implementace naleznete na <a href="http://www.libsdl.org/languages.php">domovské stránce SDL</a>.</p>
+
+
+<h2>Licence</h2>
+
+<p>SDL je k dispozici pod licencí GNU Lesser General Public License (GNU LGPL) verze 2 nebo novější. Podrobnosti ohledně licencování naleznete na <a href="http://www.libsdl.org/license.php">licenční stránce SDL</a> nebo přímo v <a href="http://www.gnu.org/copyleft/lgpl.html">textu licence</a>.</p>
+
+<p>Všechny ukázkové programy k těmto článkům budou šířeny, pokud výslovně nebude uvedeno jinak, pod licencí GNU General Public License (GNU GPL) verze 2 nebo novější.</p>
+
+
+<h2>Výhody a nevýhody</h2>
+
+<p>Hlavní výhody už byly popsány výše, jsou jimi především přenositelnost, jednoduchost, rychlost, flexibilita...</p>
+
+<p>Co se týče nevýhod, existuje asi jen jediná. Dokumentace je sice celkem kvalitní, ale začíná být trochu zastaralá (z roku 2001) - neobsahuje popis některých nově přidaných vlastností. Dá se to však kompenzovat pročtením hlavičkových souborů, které jsou hodně a dobře komentované, dostupností zdrojových kódů a spoustou ukázkových programů. U <a href="http://www.libsdl.org/cgi/docwiki.cgi/">online dokumentace</a> je také spousta příspěvků přidaných uživateli (ve formě diskuze/fóra u každé stránky), které také často pomohou.</p>
+
+
+<h2>Kde lze SDL získat?</h2>
+
+<p>Adresa <a href="http://www.libsdl.org/">http://www.libsdl.org/</a> je prvním místem, které by měl programátor, hledající cokoliv ohledně SDL, navštívit. Lze zde nalézt naprosto vše, včetně dokumentace, tutoriálů, FAQ, souborů pro download, stovek aplikací a knihoven využívajících SDL (většinou včetně zdrojových kódů) a spousty dalších věcí.</p>
+
+<p> Samotné SDL bývá také standardně u naprosté většiny Linuxových distribucí, u jiných operačních systémů bude nutné stahovat. Pokud plánujete vývoj nebo kompilaci programů, jsou nutné devel balíčky, které obsahují hlavičkové soubory, dynamické knihovny, zdrojové kódy, dokumentaci a několik ukázkových programů. Runtime knihovny jsou pouze pro spouštění již zkompilovaných programů.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="sdl_01.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>V následujícím dílu se podíváme na instalaci SDL a vytváření projektů v gcc, MS Visual C++ a Dev-C++. Na popis kódu se pravděpodobně ještě nedostane.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 06.02.2005</div>
+
+</body>
+</html>

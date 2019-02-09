@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (16)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (16)</h1>
+
+<p class="perex">V dnešním díle se podíváme na systémové časovače a funkce pro práci s časem. Na konci budou také v rychlosti zmíněny rychlostní optimalizace včetně výpočtu FPS.</p>
+
+
+<h2>Systémové časovače</h2>
+
+<p>Pokud je nutné spouštět nějakou funkci s určitou frekvencí neustále dokola, může být výhodné využít služeb systémového časovače. Jedná se o mechanismus, kterým je možné požádat SDL, aby vždy po uplynutí určitého času spustilo předem specifikovaný kód. Při používání časovačů je nutné předat do funkce SDL_Init() v inicializaci symbolickou konstantu SDL_INIT_TIMER.</p>
+
+<p>Časovač se aktivuje funkcí SDL_AddTimer(), jejíž první parametr definuje časový interval v milisekundách, po jehož uplynutí se spustí callback funkce, té bude předáván poslední parametr. Návratovou hodnotou je ID právě vytvořeného timeru nebo NULL v případě chyby.</p>
+
+<pre>
+SDL_TimerID SDL_AddTimer(Uint32 interval,
+		SDL_NewTimerCallback callback,
+		void *param);
+</pre>
+
+<p>Identifikátor SDL_NewTimerCallback je definován jako ukazatel na funkci se dvěma parametry, která vrací Uint32.</p>
+
+<pre>
+typedef Uint32 (*SDL_NewTimerCallback)(Uint32 interval, void *param);
+</pre>
+
+<p>Spuštěný časovač se dá zastavit funkcí SDL_RemoveTimer(), předává se mu jeho ID. Minimálně při ukončování programu může být zavolání dobrým nápadem...</p>
+
+<pre>
+SDL_bool SDL_RemoveTimer(SDL_TimerID id);
+</pre>
+
+<p>Vzhledem k tomu, že zvláště začínající programátoři mívají s ukazateli na funkce mnoho problémů, následuje kompletní ukázka kódu, který je potřeba pro zprovoznění timeru napsat. Definuje se globální proměnná ukládající ID vytvářené timeru, napíše se callback funkce a ukazatel na ni se předá spolu s libovolným parametrem do SDL_AddTimer(). Pokud nevznikne žádný problém, bude se tato funkce opakovaně volat s periodou cca. jedné sekundy (1000 milisekund). Na konci se timer zastaví.</p>
+
+<pre>
+// Globální
+SDL_TimerID g_timer_id = NULL;
+
+Uint32 Callback(Uint32 interval, void* param)
+{
+	// Uživatelský kód
+
+	return interval;
+}
+
+// Spuštění časovače (např. inicializace)
+	g_timer_id = SDL_AddTimer(1000, Callback, NULL);
+
+// Zastavení časovače (např. deinicializace)
+	SDL_RemoveTimer(g_timer_id);
+</pre>
+
+<p>Jak jste si jistě všimli, callback funkci je předávána hodnota zpoždění před spuštěním. Aby se docílilo periodického volání, musí být jejím výstupem interval pro příště. Ten může být buď stejný jako předešlý (většinou return interval; - viz příklad výše), nebo libovolný jiný.</p>
+
+<p>V případě, že se předchozí interval s právě specifikovaným časem neshodují, SDL aktuální časovač zastaví a spustí nový s novou časovou konstantou. Vše se však děje na pozadí, takže se jako programátoři nemusíme o nic starat, stačí jen vrátit rozdílnou hodnotu.</p>
+
+<p>Jelikož může být callback funkce prováděna v jiném vláknu, než běží zbytek programu, měla by spouštět výhradně thread-safe funkce (problematika vícevláknového programování bude vysvětlena v následujících dílech). Nejpohodlnějším řešením může být vygenerování uživatelské události, na níž pak zareaguje sama aplikace.</p>
+
+<p>Pozn.: Časová přesnost timerů je závislá na platformě, vždy by se mělo počítat s určitou nepřesností. Co vím, tak u Win9x se udávalo cca. 55 ms a u Windows na bázi NT něco málo přes 10 ms. Jedná se však o minimální hodnoty, většinou bývají nepřesnosti vzhledem k zatížení systému mnohem vyšší.</p>
+
+<p>Například ve zmíněných MS Windows jsou timery implementovány posíláním zprávy WM_TIMER. Problémem je, že pokud se už ve frontě tato událost nachází, není do ní nikdy vložena znovu. Tudíž, kdyby aplikace kontrolovala frontu řekněme jednou za sekundu (extrém) a timer byl nastaven na periodu 20 ms, dostávala by aplikace stále jen jednu zprávu za sekundu a ostatní by byly ignorovány.</p>
+
+
+<h2>Zpoždění</h2>
+
+<p>Vykonávání programu se dá pozastavit voláním funkce SDL_Delay(), které se předá požadovaný čas v milisekundách. Tato doba bude však z technických důvodů vždy o něco delší.</p>
+
+<pre>
+void SDL_Delay(Uint32 ms);
+</pre>
+
+<p>Volání SDL_Delay() umožní operačnímu systému přidělit čas CPU i ostatním procesům, resp. program jím říká, že mu po specifikované časové údobí nemusí přidělovat žádný čas procesoru a má ho raději věnovat běhu ostatních procesů/programů, protože by stejně nic nedělal.</p>
+
+<p>Pozn.: Z minulého odstavce jste jistě vytušili, že generovat časové zpoždění pomocí tří vnořených cyklů není zrovna nejšťastnější nápad... ;-)</p>
+
+<p>Volání této funkce s intervalem větším než, řekněme, jedna sekunda také není moc vhodné. Program je kompletně pozastaven a tudíž nereaguje na žádné uživatelské vstupy, nepřekresluje okno a nedělá zkrátka vůbec nic, co dělá v normálním režimu.</p>
+
+<p>První, co napadne uživatele sedícího před monitorem, je, že se ten ***** program zase zaseknul, a v podstatě má pravdu. Takže začne chaoticky klikat na ukončovací křížek, mačkat nejrůznější klávesové zkratky a i když byl program pozastaven záměrně, příchozí SDL_QUIT po obnovení do normálního režimu, popř. systémový kill, ho dozajista ukončí.</p>
+
+
+<h2>Zjištění uplynulého času</h2>
+
+<p>Funkce SDL_GetTicks() vrací tzv. referenční čas, u něhož nás nezajímá ani tak hodnota (v tomto případě počet milisekund od inicializace SDL), jako rozdíl hodnot ze dvou volání funkce, který se použije pro výpočet např. posunutí objektu v čase na novou pozici.</p>
+
+<pre>
+Uint32 SDL_GetTicks(void);
+</pre>
+
+<p>Mimochodem, pozor na přetečení datového typu po cca. 49 dnech, pokud je možné, že program poběží tak dlouho.</p>
+
+<p>SDL_GetTicks() netrpí podobným neduhem, jako funkce s analogickým určením z některých jiných knihoven. Např. často používaná GetTickCount() z Win32 API vrací &quot;konstantní&quot; hodnotu, která se vždy po uplynutí ~55 milisekund skokově aktualizuje. Mimochodem, aby nevznikl flame, ve Windows je možné použít tzv. Performance counter, který je výrazně přesnější než obyčejný GetTickCount().</p>
+
+
+<h2>Rychlostní optimalizace her</h2>
+
+<p>Většina her potřebuje nějakým způsobem zajistit, aby byly všechny pohyby a animace stejně rychlé na všech počítačích, na kterých poběží. Bez zpětné vazby bude jistě rozdíl, když se hra vyvíjená na 300 MHz počítači spustí na 3 GHz systému.</p>
+
+<p>V případě, že program implementuje klasickou herní smyčku, může být rozdíl hodnot ze dvou po sobě jdoucích volání výše zmíněné funkce SDL_GetTicks() použit pro rychlostní optimalizace. Vždy se pracuje výhradně s diferencí současného času a času průchodu stejným místem v minulosti. Ukázka bude asi názornější.</p>
+
+<pre>
+// Globální proměnná
+Uint32 g_last_time = 0;
+
+// Hlavní smyčka programu
+bool done = false;
+while(!done)
+{
+	Uint32 dt = SDL_GetTicks() - g_last_time;
+
+	// Zbytečně malý interval (~100 FPS)
+	if(dt &lt; 20)
+	{
+		// Nechá něco i ostatním procesům
+		SDL_Delay(10);
+		dt = SDL_GetTicks() - g_last_time;
+	}
+
+	g_last_time = SDL_GetTicks();
+
+	ProcessEvent();	// Události
+	Update(dt);	// Aktualizace scény
+	Draw();		// Překreslení
+}
+</pre>
+
+<p>Všimněte si, že aktualizační funkci Update() se předává vypočtená hodnota časové diference. Násobení změny pozice diferencí času způsobí, že všechny pohyby budou při spuštění i třeba na desetkrát rychlejším počítači pro uživatele vždy stejné.</p>
+
+<pre>
+int g_xpos, g_ypos;
+
+void Update(Uint32 dt)
+{
+	g_xpos += 0.01 * dt;
+	g_ypos += 0.01 * dt;
+}
+</pre>
+
+<p>Jedná-li se o výkonný počítač, je dt nízké a přírůstek pozice kvůli násobení menší, než na pomalém systému, nicméně bude aplikován častěji. U výrazně pomalého počítače budou přírůstky vysoké, ale kvůli malé frekvenci začne docházet k trhání pohybů. Pak existují jen dvě možnosti: buď se pokusit o optimalizace programu, nebo upgrade počítače.</p>
+
+
+<h2>Výpočet FPS</h2>
+
+<p>Existují dva základní způsoby, jak vypočítat počet překreslení scény za sekundu (FPS). První napadne asi každého, v každém průchodu hlavní smyčkou inkrementovat čítač a otestovat, jestli už uplynul čas jedné sekundy od začátku počítání. Pokud ano, obsahuje čítač požadovanou hodnotu FPS.</p>
+
+<p>Druhou možností je použít matematiku a počítat FPS dynamicky. Máme-li k dispozici rozdíl časů mezi dvěma překresleními, stačí se zeptat kolikrát by se vešly do jedné sekundy.</p>
+
+<pre>
+float fps = 1000.0f / dt;
+</pre>
+
+<p>Vždy byste se měli ujistit, že dt neobsahuje nulu. V minulém příkladu by se nic vážného nestalo, ale tady by došlo k dělení nulou. Aktualizační funkce s využitím FPS bude vypadat následovně, objekt se bude pohybovat v obou souřadnicových osách rychlostí 100 pixelů za sekundu.</p>
+
+<pre>
+int g_xpos, g_ypos;
+
+void Update(float fps)
+{
+	g_xpos += 100.0f / fps;
+	g_ypos += 100.0f / fps;
+}
+</pre>
+
+<p>Je nutné podotknout, že ať už se pohyby objektů regulují pomocí fps nebo dt, výsledek bude vždy stejný. FPS je ale možná o něco přirozenější, také neříkáte, že auto ujede 0.01 metrů za x (mili)sekund, ale že jeho rychlost je 100 km/h.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Systémový časovač</h3>
+
+<p>Dnešní ukázkový program tvoří základ pro hru ve stylu Pacmana. Na pozadí je dlaždicově vykreslena mřížka, ve které se pohybuje hráč ovládaný šipkami. Pohyby jsou implementovány pomocí systémového timeru, který lze zrychlit/zpomalit klávesami +/-. <a href="./src/sdl_16_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/16_prog_a.png" width="322" height="259" alt="Systémový časovač" /></div>
+
+<p>Ukázku na herní smyčku s FPS optimalizacemi lze najít například v ukázkovém příkladu z <a href="sdl_12.html">dvanáctého dílu</a>, ale i mnoha dalších.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_16_a.tar.gz">Příklad: Systémový časovač</a></li>
+<li><a href="sdl_16.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se podíváme na práci se zvuky a hudbou.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 12.06.2005</div>
+
+</body>
+</html>

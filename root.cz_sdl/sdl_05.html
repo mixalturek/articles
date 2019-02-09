@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (5)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (5)</h1>
+
+<p class="perex">Dnes se podíváme na grafické funkce poskytované knihovnou SDL. Vzhledem k rozsáhlosti tohoto tématu zde budou uvedeny pouze nejzákladnější věci, podrobnostem se budeme věnovat až v následujících dílech.</p>
+
+
+<h2>Návratové hodnoty funkcí</h2>
+
+<p>Většina SDL funkcí zabývajících se grafikou dodržuje pravidlo, že nulová návratová hodnota značí úspěch a mínus jednička neúspěch. Pokud tedy nebude uvedeno jinak, platí u funkcí vracejících int tyto hodnoty. Volání funkcí, které vracejí ukazatele, by měly být ošetřeny klasicky na NULL.</p>
+
+
+<h2>Nahrávání obrázků z disku</h2>
+
+<p>SDL umí nahrávat pouze obrázky ve formátu BMP, ale díky knihovně SDL_image, která se už stala defakto jeho součástí, může programátor používat i PCX, GIF, JPG, PNG, TGA, TIFF a další méně známé formáty. Stejně jako celé SDL je i SDL_image šířena pod licencí GNU LGPL a lze ji najít na adrese <a href="http://www.libsdl.org/projects/SDL_image/"> http://www.libsdl.org/projects/SDL_image/</a>.</p>
+
+<p>Po přilinkování knihovny a vložení hlavičkového souboru SDL_image.h je možné volat funkci IMG_Load(), která vrací surface nahrávaného obrázku. Formát je detekován automaticky podle přípony, hlaviček apod.</p>
+
+<pre>
+SDL_Surface *SDL_LoadBMP(const char *file);
+SDL_Surface *IMG_Load(const char *file);
+</pre>
+
+
+<h2>Ukládání obrázků</h2>
+
+<p>SDL kromě nahrávání surface z disku umožňuje i ukládání. Jedná se opět pouze o formát BMP, SDL_image ukládání bohužel neumožňuje.</p>
+
+<pre>
+int SDL_SaveBMP(SDL_Surface *surface, const char *file);
+</pre>
+
+
+<h2>Uvolnění surface</h2>
+
+<p>Ke smazání surface lze použít následující funkci, která se o vše postará.</p>
+
+<pre>
+void SDL_FreeSurface(SDL_Surface *surface);
+</pre>
+
+
+<h2>Konverze formátu surface</h2>
+
+<p>Není to podmínkou, ale pokud bude mít surface obrázku stejný formát, jako má okno, jeho zobrazení bude stát procesor mnohem méně výkonu. Nejlepší ze všeho je ihned po vytvoření surface zavolat funkci SDL_DisplayFormat() (resp. SDL_DisplayFormatAlpha() pro surface s alfa kanálem), která se postará o konverzi. Parametrem je převáděný surface a vrácen je nový surface s požadovaným formátem nebo NULL při neúspěchu.</p>
+
+<pre>
+SDL_Surface *SDL_DisplayFormat(SDL_Surface *surface);
+SDL_Surface *SDL_DisplayFormatAlpha(SDL_Surface *surface);
+</pre>
+
+<p>Výše uvedené funkce využívají služeb SDL_ConvertSurface(), která je jejich obecnější variantou.</p>
+
+<pre>
+SDL_Surface *SDL_ConvertSurface(SDL_Surface *src,
+		SDL_PixelFormat *fmt, Uint32 flags);
+</pre>
+
+<p>První parametr opět představuje zdrojový surface, druhým je požadovaný pixel formát (většinou surface_vzoru->format) a třetím jsou flagy, které už byly probrány dříve (SDL_SWSURFACE, SDL_HWSURFACE apod.).</p>
+
+
+<h2>Vykreslování</h2>
+
+<p>Základem veškerého blittingu je v SDL funkce SDL_BlitSurface(), která vezme pixely ze zdrojového surface src a zkopíruje je do cílového surface dst, jímž je většinou, ale ne vždy, framebuffer okna. Funkce samozřejmě umožňuje specifikovat pozici a rozměry oblasti, díky čemuž nemusí být kopírován celý surface.</p>
+
+<p>Pozn.: Termín blitting obecně označuje kopírování pixelů z jedné paměti do druhé. Nemusí se však jednat pouze o strohé přepsání dat, ale mohou se provádět různé další operace - např. přeskakovat pixely určité barvy, míchat zdrojový pixel s cílovým v závislosti na alfa kanálu (blending) a podobně. SDL_BlitSurface() vykonává všechny tyto operace.</p>
+
+<pre>
+int SDL_BlitSurface(SDL_Surface *src, SDL_Rect *srcrect,
+		SDL_Surface *dst, SDL_Rect *dstrect);
+</pre>
+
+<p>Pokud bude za některý z obdélníků předán NULL, bude se pracovat s celým objektem, u cílové oblasti se používá pouze pozice, žádné roztahování nebo zmenšování tedy není možné. Po návratu z funkce bude cílový obdélník obsahovat rozměry oblasti, se kterými se při blittingu pracovalo ve skutečnosti, tato hodnota se bude hodit při aktualizaci okna (viz níže). Výsledek blittingu do značné míry závisí na vlastnostech surfaců, především alfa kanálu a transparentní barvě.</p>
+
+<p>Návratovou hodnotou je klasicky 0 (úspěch) a -1 (neúspěch). Pokud bude u hardwarového surface vráceno -2, byla jeho video paměť ztracena. V takovém případě by měl být surface znovu nahrán/vytvořen. Stává se to během přepínání z celoobrazovkového režimu do okna, pokud SDL využívá služeb DirectX 5.0. Pro podrobnosti odkazuji na SDL manuál.</p>
+
+<p>Pozn.: Možná to bude jen přežitek starších verzí, protože SDL v současnosti přepínání aplikace mezi fullscreenem a oknem pod operačním systémem MS Windows vůbec neumožňuje.</p>
+
+
+<h2>Aktualizace obsahu okna</h2>
+
+<p>Aby se zobrazila právě vykreslená scéna, je potřeba vykonat ještě jednu operaci - aktualizovat oblast okna, na kterou se kreslilo. V parametrech funkce se předává neplatný obdélník, jehož žádná část by neměla přesahovat okraje okna - neprovádí se žádné testy a tedy ani ořezávání. Pokud budou předány samé nuly, aktualizuje se celé okno. Tyto funkce by nikdy neměly být volány na zamknutý surface.</p>
+
+<pre>
+void SDL_UpdateRect(SDL_Surface *screen,
+		Sint32 x, Sint32 y, Sint32 w, Sint32 h);
+void SDL_UpdateRects(SDL_Surface *screen,
+		int numrects, SDL_Rect *rects);
+</pre>
+
+<p>Co se týká druhé uvedené funkce, má stejný význam jako první, kromě toho, že lze specifikovat více obdélníků najednou. Tyto obdélníky však nejsou testovány na vzájemné přesahy, jejich aktualizace probíhají nezávisle.</p>
+
+<p>V případě, že okno používá double buffering (SDL_DOUBLEBUF předaný do SDL_SetVideoMode()), buffery se prohodí voláním SDL_Flip(). Hardware pak počká na vertikální zatmění stínítka monitoru a až poté provede požadovanou operaci.</p>
+
+<pre>
+int SDL_Flip(SDL_Surface *screen);
+</pre>
+
+<p>Pokud hardware double buffering nepodporuje nebo není zapnutý, je SDL_Flip() ekvivalentní volání SDL_UpdateRect(screen, 0, 0, 0, 0), čili překreslí se celé okno.</p>
+
+
+<h2></h2>
+
+<p></p>
+
+
+<h2>Ukázkové programy</h2>
+
+<p>Jelikož by se mnoho kódu z příkladů pokaždé opakovalo, budou obecně použitelné funkce umisťovány do souborů functions.h a functions.cpp. Prozatím bude obsahovat pouze pomocnou funkci na nahrávání obrázků z disku a funkci pro výpočet počtu snímků za sekundu. Animace a pohyby v programu díky FPS poběží stejně rychle na každém počítači. <a href="./src/sdl_05_func.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h3>Hello, SDL graphic!</h3>
+
+<p>Asi nejjednodušší program, jaký lze vytvořit na demonstraci použití SDL grafiky. Vykresluje se v něm jednoduchý obrázek, který byl nahrán z disku za použití knihovny SDL_image. Na své centrované pozici zůstává i při roztahování okna. <a href="./src/sdl_05_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/05_prog_a.png" width="328" height="269" alt="Hello, SDL graphic!" /></div>
+
+
+<h3>Objekt odrážející se od okrajů</h3>
+
+<p>Druhý příklad je o něco složitější než ten první. Místo statického obrázku je vykreslován dynamický objekt, který se pohybuje po přímce oknem a odráží se od okrajů. Díky tomu, že obsahuje i alfa kanál, jím může prosvítat pozadí. <a href="./src/sdl_05_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/05_prog_b.png" width="328" height="269" alt="Objekt odrazejici se od okraju" /></div>
+
+
+<p>Ve vnitřního fungování programů existuje jeden rozdíl. U prvního má okno pouze jeden buffer a scéna se po vykreslení aktualizuje pomocí funkce SDL_UpdateRect(). Druhý příklad využívá double buffering (je-li podporován) a scéna se musí aktualizovat voláním SDL_Flip(). SDL_UpdateRect() by v tomto případě nemělo žádný efekt.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="http://www.libsdl.org/projects/SDL_image/">Knihovna SDL_image</a></li>
+<li><a href="./src/sdl_05_a.tar.gz">Příklad: Hello, SDL graphic!</a></li>
+<li><a href="./src/sdl_05_b.tar.gz">Příklad: Objekt odrážející se od okrajů</a></li>
+<li><a href="sdl_05.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Tento článek obsahoval pouze základní úvod do kreslení pomocí knihovny SDL, další podrobnosti přijdou v následujících dílech.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 24.02.2005</div>
+
+</body>
+</html>

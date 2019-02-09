@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (3)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (3)</h1>
+
+<p class="perex">V první části článku se podíváme na konvenci názvů SDL funkcí a speciální datové typy, které SDL přináší. V druhé části bude popsána inicializace a deinicializace SDL.</p>
+
+
+<h2>Konvence názvů SDL funkcí</h2>
+
+<p>Knihovna SDL má jen jednoduchou konvenci pro pojmenování svých funkcí, v podstatě se jedná pouze o předponu SDL_. Jako příklad lze uvést jakoukoli funkci, např. inicializační SDL_Init() se musí zavolat na začátku naprosto každého programu, který využívá služeb knihovny SDL.</p>
+
+<p>Za předponou SDL_ se dále může nacházet WM_ nebo GL_, které označuje funkci poskytující operace vztahující se ke správci oken (Window Manager) popř. týkající se knihovny OpenGL. Jako příklad lze uvést příkaz SDL_WM_ToggleFullScreen(), jenž přepíná aplikaci mezi režimem okno/fullscreen, a SDL_GL_SwapBuffers() sloužící pro výměnu předního a zadního bufferu po vykreslení OpenGL scény.</p>
+
+<p>Z předchozích dvou příkladů si lze všimnout, že těla jmen funkcí začínají velkým písmenem a pokud se skládají z více slov, jsou počáteční písmena jednotlivých slov velká.</p>
+
+
+<h2>SDL datové typy</h2>
+
+<p>Pro dosažení co největší přenositelnosti kódu definuje SDL své vlastní datové typy, které se při deklaraci proměnných doporučuje upřednostňovat. S jejich použitím se nestane, že u jiného kompilátoru nebo systému, než na kterém probíhá hlavní vývoj, bude mít některý datový typ programovacího jazyka jiný rozsah. Klasickým příkladem je šestnácti a třiceti dvou bitový int.</p>
+
+<p>SDL definuje následující datové typy:</p>
+
+<table>
+<tr align="left"><th>Jazyk C</th>	<th>SDL</th></tr>
+<tr><td>int</td>				<td>SDL_bool (SDL_FALSE, SDL_TRUE)</td></tr>
+<tr><td>unsigned char</td>		<td>Uint8</td></tr>
+<tr><td>unsigned short</td>		<td>Uint16</td></tr>
+<tr><td>unsigned int</td>		<td>Uint32</td></tr>
+<tr><td>unsigned long long</td>	<td>Uint64</td></tr>
+<tr><td>signed char</td>		<td>Sint8</td></tr>
+<tr><td>signed short</td>		<td>Sint16</td></tr>
+<tr><td>signed int</td>			<td>Sint32</td></tr>
+<tr><td>signed long long</td>		<td>Sint64</td></tr>
+</table>
+
+<p>Je nutné podotknout, že 64-bitový int nemusí být podporován všemi platformami.</p>
+
+
+<h2>Hlavičkové soubory</h2>
+
+<p>Při vývoji stačí většinou vkládat pouze hlavičkový soubor SDL.h, jiné se používají spíše ve speciálních nebo výjimečných případech. Osobně jsem se dále setkal jen se SDL_opengl.h, který řeší umístění knihovny OpenGL na různých platformách. Např. v MacOS je k ní jiná cesta než ve Windows a Linuxu.</p>
+
+<pre>
+#include &lt;SDL.h&gt;
+</pre>
+
+<p>V zájmu přenositelnosti by také měla být zachována uvedená velikost písmen - tedy SDL velkými a malé h, aby ho byl case sensitive operační systém schopen najít. I když se to nezdá, jedná se o docela častý problém Windows programátorů, kteří, když se onehdy rozhodnou portovat svůj jinak naprosto správný program, stráví tři hodiny nadáváním na ten každý-si-doplňte-své-slovo Linux ;-).</p>
+
+<p>Někdy se lze také setkat s vkládáním hlavičkového souboru jako SDL/SDL.h, ale tento způsob spíše vytváří problémy (/ a \ lomítko), než něčemu pomáhá. Cestu k hlavičkovým souborům lze nastavit ve vývojovém prostředí.</p>
+
+
+<h2>Vstup do programu</h2>
+
+<p>Že první funkcí, kterou volá operační systém při spouštění programu, je main(), ví jistě každý programátor. I přesto, že je vytvářena MS Windows aplikace, měla by být tato funkce upřednostněna před WinMain(). Před samotným spuštěním main() SDL provádí ještě určité inicializace.</p>
+
+<p>Pokud je z nějakého důvodu WinMain() nutná, podívejte se do souboru src/main/win32/SDL_main.c ve zdrojových kódech SDL, abyste věděli jaký druh dodatečné inicializace ještě potřebujete, aby SDL pracovalo tak, jak má.</p>
+
+<p>Některé &quot;exotické&quot; kompilátory také mohou mít problémy s formátem zápisu main(), a proto by měla být vždy deklarována takto</p>
+
+<pre>
+int main(int argc, char *argv[])
+</pre>
+
+
+<h2>Inicializace SDL</h2>
+
+<p>SDL se inicializuje voláním funkce</p>
+
+<pre>
+int SDL_Init(Uint32 flags);
+</pre>
+
+<p>která při úspěchu vrátí hodnotu 0 a při neúspěchu -1. Parametr flags specifikuje, co všechno se má inicializovat. Lze předat symbolické konstanty z následující tabulky nebo jejich binárně OR-ovanou kombinaci.</p>
+
+<table>
+<tr align="left"><th>Symbolická konstanta</th>	<th>Inicializuje se...</th></tr>
+<tr><td>SDL_INIT_VIDEO</td>				<td>grafika</td></tr>
+<tr><td>SDL_INIT_AUDIO</td>				<td>zvuky</td></tr>
+<tr><td>SDL_INIT_TIMER</td>				<td>časovače</td></tr>
+<tr><td>SDL_INIT_CDROM</td>				<td>CD-ROM</td></tr>
+<tr><td>SDL_INIT_JOYSTICK</td>			<td>joystick</td></tr>
+<tr><td>SDL_INIT_EVERYTHING</td>			<td>vše</td></tr>
+<tr><td>SDL_INIT_NOPARACHUTE</td>			<td>nereagovat na chybové signály (SIGSEGV ap.)</td></tr>
+</table>
+
+<p>Linux a BeOS podporují také parametr SDL_INIT_EVENTTHREAD, který, pokud bude předán do SDL_Init(), způsobí, že smyčka hlídající události bude běžet asynchronně ve vlastním vláknu.</p>
+
+<p>Pozn.: Pokud budete mít problémy s laděním SDL aplikace ve Visual C++ debuggeru, zkuste nastavit flag SDL_INIT_NOPARACHUTE.</p>
+
+
+<h2>Inicializace dalších subsystémů</h2>
+
+<p>Kdykoli po hlavní inicializaci lze pomocí následující funkce inicializovat i další subsystémy. Chování obou rutin je analogické.</p>
+
+<pre>
+int SDL_InitSubSystem(Uint32 flags);
+</pre>
+
+
+<h2>Kontrola inicializace subsystémů</h2>
+
+<p>Zjištění, které subsystémy byly inicializovány a které ne se provede pomocí</p>
+
+<pre>
+Uint32 SDL_WasInit(Uint32 flags);
+</pre>
+
+<p>Za parametr flags se předají subsystémy, které se mají otestovat a vrácena je bitová maska subsystémů, které jsou inicializované.</p>
+
+<p>V následujícím příkladu se pokusí aplikace o inicializaci grafického a zvukového subsystému. Pokud se grafiku nepodaří inicializovat, program skončí. V případě nedostupnosti zvuků bude program pokračovat dále bez nich.</p>
+
+<pre>
+// Globální proměnná
+bool use_audio = true;
+
+// V main()
+if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) == -1)
+{
+	fprintf(stderr, &quot;Unable to initialize SDL: %s\n&quot;,
+			SDL_GetError());
+
+	Uint32 flags = SDL_WasInit(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
+	// Grafika musí být vždy
+	if(!(flags & SDL_INIT_VIDEO))
+	{
+		SDL_Quit();
+		return 1;
+	}
+
+	// Zvuky používat pouze, pokud jsou dostupné
+	use_audio = (flags & SDL_INIT_AUDIO) ? true : false;
+}
+</pre>
+
+
+<h2>Určení typu chyby</h2>
+
+<p>V příkladu výše byla po neúspěšné inicializaci vypisována chybová zpráva, na jejíž konec byl připojen řetězec s upřesněním získaným od SDL. Funkce SDL_GetError() vrátí NULLem ukončený řetězec, obsahující informace o poslední vnitřní chybě SDL.</p>
+
+<pre>
+char *SDL_GetError(void);
+</pre>
+
+<p>Dále existují ještě dvě funkce, které jsou však určeny spíše pro vývojáře knihovny SDL než pro její uživatele. Pomocí první se nastavuje řetězec s chybou a druhou se maže.</p>
+
+<pre>
+void SDL_SetError(const char *fmt, ...);
+void SDL_ClearError(void);
+</pre>
+
+<p>Pozn.: U výše uvedeného výpisu textu pomocí fprintf() resp. printf() se v Linuxu zobrazí text do konzole, pod MS Windows v nekonzolové aplikaci se ve stejném adresáři, kde je umístěn spuštěný EXE soubor, automaticky vytvoří soubory stderr.txt a stdout.txt.</p>
+
+
+<h2>Deinicializace</h2>
+
+<p>Před ukončením programu by měla být vždy zavolána funkce SDL_Quit(), která se postará o veškerý úklid.</p>
+
+<pre>
+void SDL_Quit(void);
+</pre>
+
+<p>V některých cizích zdrojových kódech se lze též setkat s příkazem atexit(SDL_Quit);, který je zapsán hned za SDL_Init() a který při ukončení programu zavolá SDL_Quit() automaticky. Nicméně každá trochu delší aplikace obsahuje alespoň náznak nějaké ukončovací logiky, lepší je umístit SDL_Quit() tam.</p>
+
+<p>Podobně jako mělo SDL_Init() protějšek v SDL_InitSubSystem() i SDL_Quit() má svůj SDL_QuitSubSystem(). Pokud ale není subsystém ukončován někde uprostřed aplikace, stačí na konci zavolat pouze SDL_Quit() a je uvolněno všechno.</p>
+
+<pre>
+void SDL_QuitSubSystem(Uint32 flags);
+</pre>
+
+
+<h2>Ukázkový program</h2>
+
+<p>Tento díl bude bohužel bez příkladu. Probíraná látka byla předběžně ukázána už v programu z minulé lekce.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="sdl_03.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se podíváme na vytváření okna se vším, co s tím souvisí.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 10.02.2005</div>
+
+</body>
+</html>

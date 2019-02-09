@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (4)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (4)</h1>
+
+<p class="perex">V minulém dílu jsme si dopodrobna vysvětlili inicializaci SDL, ale ještě něco málo zbylo - nastavení vlastností a vytvoření okna. Jak brzy zjistíme, v porovnání s např. Win32 API je tato činnost v SDL mnohem jednodušší.</p>
+
+
+<h2>Vytvoření okna</h2>
+
+<p>V nejjednodušším a většinou zcela dostačujícím případě se jedná pouze o volání jediné jednoduché funkce. Ne nadarmo se říká, že SDL nechává programátora koncentrovat se na vývoj vlastní hry, místo toho, aby se staral o složité detaily operačního systému...</p>
+
+<pre>
+SDL_Surface *SDL_SetVideoMode(int width, int height,
+		int bpp, Uint32 flags);
+</pre>
+
+<p>Návratovou hodnotou funkce je při chybě NULL, v ostatních případech ukazatel na SDL_Surface. Tato struktura v SDL představuje základní a v podstatě jediný prostředek pro ukládání pixelů obrázku a informací o něm. V tomto případě se jedná o okno (frame buffer) aplikace. Všechny funkce, které SDL poskytuje pro 2D grafiku, jsou realizovány nad touto strukturou.</p>
+
+<p>Parametry width a height určují šířku klientské oblasti okna, bpp specifikuje barevnou hloubku v bitech. Pokud se vloží hodnota 0, bude použita barevná hloubka aktuálně nastavená v systému. Parametr flags specifikuje vlastnosti okna a lze předat některou z následujících symbolických konstant nebo jejich kombinaci (binární OR).</p>
+
+
+<ul>
+<li class="vspace">SDL_SWSURFACE, SDL_HWSURFACE<br />Vytvoří surface v systémové nebo video paměti. Pokud nebudou pixely surface často modifikovány, je lepší je uložit přímo do video paměti, protože se pak bude využívat hardwarové akcelerace.</li>
+
+<li class="vspace">SDL_ASYNCBLIT<br />Povolí asynchronní aktualizaci surface. Tímto se sice na jednoprocesorových systémech blitting (kreslení jednoho obrázku do druhého) většinou zpomalí, ale na SMP systémech dojde ke zrychlení.</li>
+
+<li class="vspace">SDL_ANYFORMAT<br />Obyčejně, pokud není požadovaná barevná hloubka video surface dostupná, SDL přistoupí k emulaci. Předáním SDL_ANYFORMAT se tomuto předejte - SDL použije video surface s jakoukoli z dostupných barevných hloubek, ale bez emulace.</li>
+
+<li class="vspace">SDL_HWPALETTE<br />Poskytne SDL exkluzivní přístup k paletě. Bez tohoto flagu nemusí vždy jít získat barva požadovaná přes SDL_SetColors() nebo SDL_SetPalette().</li>
+
+<li class="vspace">SDL_DOUBLEBUF<br />Povolí hardwarový double buffering. Veškeré kreslení se pak bude provádět na skrytém/nezobrazeném bufferu. Po jeho ukončení se buffery zamění voláním SDL_Flip(). Tento parametr je validní pouze spolu se SDL_HWSURFACE.</li>
+
+<li class="vspace">SDL_FULLSCREEN<br />Aplikace nepoběží v okně, ale v celoobrazovkovém režimu. Pokud není z jakéhokoli důvodu změna hardwarového rozlišení možná, bude použito následující vyšší rozlišení a scéna se vycentruje na černém pozadí.</li>
+
+<li class="vspace">SDL_OPENGL<br />Vytvoří okno s podporou OpenGL. Před vlastním voláním SDL_SetVideoMode() by měly být již nastaveny atributy přes SDL_GL_SetAttribute(), pozdější změna již není možná. Použití OpenGL bude věnován některý z budoucích dílů.</li>
+
+<li class="vspace">SDL_OPENGLBLIT<br />Má stejný význam jako předchozí parametr, ale s tím rozdílem, že bude zároveň možné provádět SDL blitting. Scéna (2D) může mít alfa kanál a pro aktualizaci musí být použito SDL_UpdateRects().</li>
+
+<li class="vspace">SDL_RESIZABLE<br />Bude možná změna velikosti okna. Při roztahování se bude generovat událost SDL_VIDEORESIZE a může být opět zavoláno SDL_SetVideoMode() s novými rozměry.</li>
+
+<li class="vspace">SDL_NOFRAME<br />Pokud je to možné, vytvoří okno bez titulku a rámu. V celoobrazovkovém režimu se nastavuje automaticky.</li>
+</ul>
+
+<p>Pozn.: Pokud je funkcionalita poskytovaná daným parametrem z nějakého důvodu důležitá, lze otestovat flagy z vráceného surface.</p>
+
+
+<h2>Získání video surface</h2>
+
+<p>Ukazatel na aktuální zobrazený surface lze získat pomocí následující funkce. V případě, že SDL provádí nějaké konverze formátu, bude vrácen veřejně viditelný surface, ne opravdový.</p>
+
+<pre>
+SDL_Surface *SDL_GetVideoSurface(void);
+</pre>
+
+
+<h2>Zjištění dostupnosti video formátu</h2>
+
+<p>Před samotným vytvořením okna může být dobré nejdříve zjistit, zda jsou požadované parametry vůbec dostupné.</p>
+
+<pre>
+int SDL_VideoModeOK(int width, int height,
+		int bpp, Uint32 flags);
+</pre>
+
+<p>Funkce vrací hodnotu barevné hloubky pro nejbližší dostupný mód v závislosti na předané šířce, výšce a vlastnostech, parametry jsou tedy stejné jako u funkce SDL_VideoMode(). Jediným rozdílem je, že nulová barevná hloubka (aktuálně nastavená v systému) není pro tuto funkci validní! Pokud není mód podporován pod žádnou barevnou hloubkou, je vrácena nula.</p>
+
+
+<h2>Seznam dostupných rozměrů okna</h2>
+
+<p>Pomocí funkce SDL_ListModes() je programátor schopen nagrabovat všechna dostupná rozlišení pro daný formát pixelů a vlastnosti.</p>
+
+<pre>
+SDL_Rect **SDL_ListModes(SDL_PixelFormat *format, Uint32 flags);
+</pre>
+
+<p>Návratovou hodnotou je ukazatel na pole obdélníků, které budou navíc seřazené od největších rozměrů po nejmenší. V případě, že bude vrácen NULL nejsou dostupná žádná rozlišení a (SDL_Rect **)-1 oznamuje, že jakékoli rozlišení je v pořádku.</p>
+
+<p>Pokud se za parametr format předá NULL, bude seznam vztáhnut vzhledem k SDL_GetVideoInfo()-&gt;vfmt (viz dále). Při zjišťování jsou spíše důležité flagy než formát pixelů. Pokud by bylo například předáno SDL_HWSURFACE, hledalo by se pouze v hardwarově podporovaných módech.</p>
+
+<p>Struktura obdélníku je definována následovně. Atributy x a y specifikují pozici levého horního rohu, w a h rozměry. Jednotky jsou v pixelech.</p>
+
+<pre>
+typedef struct
+{
+	Sint16 x, y;
+	Uint16 w, h;
+} SDL_Rect;
+</pre>
+
+<p>Protože bychom zbytečně zabředli do v tuto chvíli ne zrovna životně důležitých detailů, bude struktura SDL_PixelFormat popsána až někdy v budoucnu.</p>
+
+
+<h2>Zjištění informací o grafickém hardware</h2>
+
+<p>Funkce SDL_GetVideoInfo() vrátí read only ukazatel na strukturu SDL_VideoInfo, která obsahuje informace o grafickém hardware. Pokud bude volána před SDL_SetVideoMode(), bude atribut vfmt obsahovat formát pixelů &quot;nejvhodnějšího&quot; video módu. V případě volání po SDL_SetVideoMode() bude obsahovat aktuální formát.</p>
+
+<pre>
+SDL_VideoInfo *SDL_GetVideoInfo(void);
+</pre>
+
+<p>Struktura SDL_VideoInfo se používá pouze při volání této funkce a je deklarována takto:</p>
+
+<pre>
+typedef struct
+{
+	Uint32 hw_available :1; // Lze vytvořit hardwarové surface?
+	Uint32 wm_available :1; // Lze komunikovat se správcem oken?
+	Uint32 blit_hw      :1; // Akcelerovaný blitting HW --&gt; HW
+	Uint32 blit_hw_CC   :1; // Akcelerovaný blitting s Colorkey
+	Uint32 blit_hw_A    :1; // Akcelerovaný blitting s Alpha
+	Uint32 blit_sw      :1; // Akcelerovaný blitting SW --&gt; HW
+	Uint32 blit_sw_CC   :1; // Akcelerovaný blitting s Colorkey
+	Uint32 blit_sw_A    :1; // Akcelerovaný blitting s Alpha
+	Uint32 blit_fill    :1; // Akcelerované vyplňování barvou?
+	Uint32 video_mem;       // Celkové množství video paměti v kB
+	SDL_PixelFormat *vfmt;  // Formát grafického surface
+} SDL_VideoInfo;
+</pre>
+
+<p>Pozn.: Pokud bude pod X11 paměť nulová a žádné hardwarové akcelerace dostupné, změňte grafický ovladač z X11 např. na DGA (pouze fullscreen a X11). V konzoli definujte systémovou proměnnou SDL_VIDEODRIVER ($ export SDL_VIDEODRIVER=dga) a spusťte program. Podrobnosti lze nalézt v SDL FAQ, sekce Development.</p>
+
+
+<h2>Zjištění video ovladače</h2>
+
+<p>Do řetězce specifikovaného parametrem namebuf bude uloženo maximálně maxlen znaků (včetně NULL) se jménem inicializovaného video driveru. Jedná se o jednoduché slovo jako x11, dga, directx nebo windib.</p>
+
+<pre>
+char *SDL_VideoDriverName(char *namebuf, int maxlen);
+</pre>
+
+<p>Pokud ještě nebyla grafika inicializována (SDL_Init()), bude vráceno NULL.</p>
+
+
+<h2>Gamma funkce obrazovky</h2>
+
+<p>SDL, pokud to hardware počítače umožňuje, umí změnit &quot;gamma funkci&quot;, která kontroluje jas a kontrast barev zobrazených na obrazovce. Vztažná hodnota je 1.0, tzn. nebudou se provádět žádné změny. Menší než jedna představuje ztmavení, větší než jedna zesvětlení. Meze jsou přibližně 0.1 a 10.0.</p>
+
+<pre>
+int SDL_SetGamma(float redgamma, float greengamma, float bluegamma);
+int SDL_SetGammaRamp(Uint16 *redtable, Uint16 *greentable, Uint16 *bluetable);
+int SDL_GetGammaRamp(Uint16 *redtable, Uint16 *greentable, Uint16 *bluetable);
+</pre>
+
+<p>Pomocí druhé uvedené funkce lze pro každý kanál barev předat kompletní tabulku. Jedná se o pole 256 Uint16 čísel, které reprezentuje mapování mezi vstupem a výstupem. Vstup je indexem do pole a výstup udává šestnáctibitovou hodnotu gammy na daném indexu, jejíž velikost je změněna na výstupní přesnot. Pokud se za kanál předá NULL, zůstane nezměněn. Vrácení -1 znamená, že funkce nejsou podporovány.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Vytvoření okna &quot;jednoduchým&quot; způsobem</h3>
+
+<p>Kód ukazuje pravděpodobně nejjednodušší (a také nejpoužívanější) vytvoření okna. Tento postup není zrovna flexibilní, ale bývá většinou zcela dostatečný. <a href="./src/sdl_04_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<h3>Vytvoření okna s ověřováním vlastností</h3>
+
+<p>Druhý příklad je už o něco složitější. Pokud nejsou některé parametry vytvářeného okna validní, program se je pokouší upravovat tak dlouho, dokud nejsou použitelné nebo nejdou dále upravit. Zároveň s testy vypisuje na konzoli informace, jaké modifikace právě provádí. Můžete zkusit zadávat různé flagy, záporné velikosti okna a podobně. <a href="./src/sdl_04_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<h3>Vypsání informací o grafickém hardware</h3>
+
+<p>Program nevytvoří žádné okno, ale po spuštění pouze vypíše různé informace o grafickém hardware a pak se ukončí. <a href="./src/sdl_04_c.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_04_a.tar.gz">Příklad: Vytvoření okna &quot;jednoduchým&quot; způsobem</a></li>
+<li><a href="./src/sdl_04_b.tar.gz">Příklad: Vytvoření okna s ověřováním vlastností</a></li>
+<li><a href="./src/sdl_04_c.tar.gz">Příklad: Vypsání informací o grafickém hardware</a></li>
+<li><a href="sdl_04.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se konečně začneme věnovat grafice, takže se těšte...</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 13.02.2005</div>
+
+</body>
+</html>

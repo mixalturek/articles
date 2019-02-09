@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (24)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (24)</h1>
+
+<p class="perex">Dvacátý čtvrtý díl je shrnutím celé série o multiplatformní knihovně SDL. Celý text je strukturován podle jednotlivých článků, u každého je uveden úvodní odstavec spolu se seznamem SDL příkazů, které v něm byly probrány.</p>
+
+
+<h2><a href="sdl_01.html">SDL #1</a> - Úvod</h2>
+
+<p>V této sérii článků se vám představí knihovna SDL, která slouží pro vývoj her a multimediálních programů, její největší předností je možnost zkompilovat zdrojový kód pro všechny běžně používané operační systémy. Ukázkové programy budou napsány v jazyku C/C++ a zkompilovatelné minimálně pod operačními systémy GNU/Linux a MS Windows.</p>
+
+
+<h2><a href="sdl_02.html">SDL #2</a> - Instalace SDL</h2>
+
+<p>V druhé části série si ukážeme, jak nainstalovat SDL a dále budou uvedeny &quot;step-by-step&quot; návody na vytvoření SDL projektů v gcc, MS Visual C++ a Dev-C++.</p>
+
+
+<h2><a href="sdl_03.html">SDL #3</a> - Inicializace SDL programu</h2>
+
+<p>V první části článku se podíváme na konvenci názvů SDL funkcí a speciální datové typy, které SDL přináší. V druhé části bude popsána inicializace a deinicializace SDL.</p>
+
+<p><ul>
+<li>SDL_Init()</li>
+<li>SDL_InitSubSystem()</li>
+<li>SDL_WasInit()</li>
+<li>SDL_GetError()</li>
+<li>SDL_SetError()</li>
+<li>SDL_ClearError()</li>
+<li>SDL_Quit()</li>
+<li>SDL_QuitSubSystem()</li>
+</ul></p>
+
+
+<h2><a href="sdl_04.html">SDL #4</a> - Vytvoření okna</h2>
+
+<p>V minulém dílu jsme si dopodrobna vysvětlili inicializaci SDL, ale ještě něco málo zbylo - nastavení vlastností a vytvoření okna. Jak brzy zjistíme, v porovnání s např. Win32 API je tato činnost v SDL mnohem jednodušší.</p>
+
+<p><ul>
+<li>SDL_SetVideoMode()</li>
+<li>SDL_GetVideoSurface()</li>
+<li>SDL_VideoModeOK()</li>
+<li>SDL_ListModes()</li>
+<li>Struktura SDL_Rect</li>
+<li>SDL_GetVideoInfo()</li>
+<li>Struktura SDL_VideoInfo</li>
+<li>SDL_VideoDriverName()</li>
+<li>SDL_SetGamma()</li>
+<li>SDL_SetGammaRamp()</li>
+<li>SDL_GetGammaRamp()</li>
+</ul></p>
+
+
+<h2><a href="sdl_05.html">SDL #5</a> - Zobrazování grafiky</h2>
+
+<p>Dnes se podíváme na grafické funkce poskytované knihovnou SDL. Vzhledem k rozsáhlosti tohoto tématu zde budou uvedeny pouze nejzákladnější věci, podrobnostem se budeme věnovat až v následujících dílech.</p>
+
+<p><ul>
+<li>SDL_LoadBMP()</li>
+<li>Knihovna SDL_image</li>
+<li>IMG_Load()</li>
+<li>SDL_SaveBMP()</li>
+<li>SDL_FreeSurface()</li>
+<li>SDL_DisplayFormat()</li>
+<li>SDL_DisplayFormatAlpha()</li>
+<li>SDL_ConvertSurface()</li>
+<li>SDL_BlitSurface()</li>
+<li>SDL_UpdateRect()</li>
+<li>SDL_UpdateRects()</li>
+<li>SDL_Flip()</li>
+</ul></p>
+
+
+<h2><a href="sdl_06.html">SDL #6</a> - Operace se surfacem</h2>
+
+<p>V tomto dílu budeme dále rozvíjet naše znalosti o SDL grafice. Předvedeme si například, jak vyplnit surface barvou, jak docílit toho, aby určitá barva byla transparentní (průhledná), jak nastavit průhlednost i takového surface, který neobsahuje alfa kanál, a další užitečné věci.</p>
+
+<p><ul>
+<li>SDL_CreateRGBSurface()</li>
+<li>SDL_CreateRGBSurfaceFrom()</li>
+<li>SDL_SetClipRect()</li>
+<li>SDL_GetClipRect()</li>
+<li>SDL_MapRGB()</li>
+<li>SDL_MapRGBA()</li>
+<li>SDL_GetRGB()</li>
+<li>SDL_GetRGBA()</li>
+<li>SDL_FillRect()</li>
+<li>SDL_SetColorKey()</li>
+<li>SDL_SetAlpha()</li>
+<li>SDL_SetColors()</li>
+<li>SDL_SetPalette()</li>
+</ul></p>
+
+
+<h2><a href="sdl_07.html">SDL #7</a> - Přímý přístup k pixelům, kurzory</h2>
+
+<p>Tentokrát se ponoříme trochu více do hloubky, popíšeme si SDL grafické struktury a tyto znalosti následně využijeme k přímému přístupu k pixelům obrázku. V závěru budeme také měnit kurzor myši.</p>
+
+<p><ul>
+<li>Struktura SDL_Surface</li>
+<li>Struktura SDL_PixelFormat</li>
+<li>Struktura SDL_Palette</li>
+<li>Struktura SDL_Color</li>
+<li>SDL_LockSurface()</li>
+<li>SDL_UnlockSurface()</li>
+<li>SDL_MUSTLOCK()</li>
+<li>SDL_CreateCursor()</li>
+<li>SDL_FreeCursor()</li>
+<li>SDL_SetCursor()</li>
+<li>SDL_GetCursor()</li>
+<li>SDL_ShowCursor()</li>
+</ul></p>
+
+
+<h2><a href="sdl_08.html">SDL #8</a> - OpenGL</h2>
+
+<p>Díky přímé podpoře OpenGL umožňuje SDL renderovat i 3D grafické objekty, které se staly nepsaným standardem naprosté většiny dnešních her. Tentokrát se tedy budeme věnovat podpoře OpenGL v SDL.</p>
+
+<p><ul>
+<li>Knihovna OpenGL</li>
+<li>SDL_GL_SetAttribute()</li>
+<li>SDL_GL_GetAttribute()</li>
+<li>SDL_GL_SwapBuffers()</li>
+<li>SDL_GL_GetProcAddress()</li>
+<li>SDL_GL_LoadLibrary()</li>
+</ul></p>
+
+
+<h2><a href="sdl_09.html">SDL #9</a> - Výstup textu pomocí SDL_ttf</h2>
+
+<p>V dnešním dílu bude popsána knihovna SDL_ttf, která slouží pro výpisy textů do scény. Se zobrazením textů a především s českými znaky bývá někdy potíž, nicméně použití SDL_ttf je velice jednoduché a naprosto bezproblémové.</p>
+
+<p><ul>
+<li>Knihovna SDL_ttf</li>
+<li>TTF_Init()</li>
+<li>TTF_Quit()</li>
+<li>TTF_WasInit()</li>
+<li>TTF_GetError()</li>
+<li>TTF_SetError()</li>
+<li>Struktura TTF_Font</li>
+<li>TTF_OpenFont()</li>
+<li>TTF_OpenFontIndex()</li>
+<li>TTF_OpenFontIndexRW()</li>
+<li>TTF_CloseFont()</li>
+<li>TTF_RenderText_Solid()</li>
+<li>TTF_RenderUTF8_Solid()</li>
+<li>TTF_RenderUNICODE_Solid()</li>
+<li>TTF_RenderText_Shaded()</li>
+<li>TTF_RenderUTF8_Shaded()</li>
+<li>TTF_RenderUNICODE_Shaded()</li>
+<li>TTF_RenderText_Blended()</li>
+<li>TTF_RenderUTF8_Blended()</li>
+<li>TTF_RenderUNICODE_Blended()</li>
+<li>TTF_RenderGlyph_Solid()</li>
+<li>TTF_RenderGlyph_Shaded()</li>
+<li>TTF_RenderGlyph_Blended(</li>
+<li>TTF_SetFontStyle()</li>
+<li>TTF_GetFontStyle()</li>
+<li>TTF_SizeText()</li>
+<li>TTF_SizeUTF8()</li>
+<li>TTF_SizeUNICODE()</li>
+<li>TTF_FontHeight()</li>
+<li>TTF_FontLineSkip()</li>
+<li>TTF_FontAscent()</li>
+<li>TTF_FontDescent()</li>
+<li>TTF_GlyphMetrics()</li>
+<li>TTF_ByteSwappedUNICODE()</li>
+<li>TTF_FontFaceFamilyName()</li>
+<li>TTF_FontFaceStyleName()</li>
+<li>TTF_FontFaceIsFixedWidth()</li>
+<li>TTF_FontFaces()</li>
+</ul></p>
+
+
+<h2><a href="sdl_10.html">SDL #10</a> - Komunikace se správcem oken, úvod do událostí</h2>
+
+<p>Seriál se přehoupl do druhé desítky, příště už na počítání přestanou stačit prsty ;-). Ale ještě než se tak stane, probereme si komunikaci aplikace se správcem oken, což v sobě zahrnuje změnu titulku okna, minimalizaci, přepínání do/z fullscreenu a několik dalších věcí. Ke konci bude také přidán lehký úvod do zpracování událostí.</p>
+
+<p><ul>
+<li>SDL_WM_SetCaption()</li>
+<li>SDL_WM_GetCaption()</li>
+<li>SDL_WM_SetIcon()</li>
+<li>SDL_WM_IconifyWindow()</li>
+<li>SDL_WM_ToggleFullScreen()</li>
+<li>SDL_WM_GrabInput()</li>
+</ul></p>
+
+
+<h2><a href="sdl_11.html">SDL #11</a> - Fronta událostí</h2>
+
+<p>Na konci minulého dílu jsme nakousli základní práci s událostmi, dnes budeme pokračovat. Tento článek je primárně věnován práci s frontou událostí, ale jelikož ještě nevíme nic o unionu SDL_Event, bude částečně probrán i on.</p>
+
+<p><ul>
+<li>Union SDL_Event</li>
+<li>SDL_PollEvent()</li>
+<li>SDL_WaitEvent()</li>
+<li>SDL_PumpEvents()</li>
+<li>SDL_PushEvent()</li>
+<li>SDL_PeepEvents()</li>
+<li>SDL_EventState()</li>
+<li>SDL_SetEventFilter()</li>
+<li>SDL_GetEventFilter()</li>
+</ul></p>
+
+
+<h2><a href="sdl_12.html">SDL #12</a> - Klávesnice</h2>
+
+<p>Pravděpodobně nejpoužívanějšími vstupními zařízeními počítače jsou klávesnice a myš, v našem seriálu začneme právě klávesnicí. Podíváme se na ni jak z událostního pohledu, tak &quot;přímým&quot; přístupem a uděláme první krok k interaktivním hrám.</p>
+
+<p><ul>
+<li>Struktura SDL_KeyboardEvent</li>
+<li>Struktura SDL_keysym</li>
+<li>Struktura SDLMod</li>
+<li>SDL_EnableUNICODE()</li>
+<li>SDL_EnableKeyRepeat()</li>
+<li>SDL_GetKeyState()</li>
+<li>SDL_GetModState()</li>
+<li>SDL_SetModState()</li>
+<li>SDL_GetKeyName()</li>
+</ul></p>
+
+
+<h2><a href="sdl_13.html">SDL #13</a> - Myš</h2>
+
+<p>Na řadě je další vstupní zařízení, tentokrát se jedná o myš. Opět se budeme věnovat, jak událostem, tak přímému přístupu.</p>
+
+<p><ul>
+<li>Struktura SDL_MouseButtonEvent</li>
+<li>Struktura SDL_MouseMotionEvent</li>
+<li>SDL_BUTTON()</li>
+<li>SDL_GetMouseState()</li>
+<li>SDL_GetRelativeMouseState()</li>
+<li>SDL_WarpMouse()</li>
+</ul></p>
+
+
+<h2><a href="sdl_14.html">SDL #14</a> - Joystick</h2>
+
+<p>Joysticky, kniply, páky a jiné ovladače bývají nedílnou součástí většiny her, hlavně simulátorů. Tento díl bude věnován právě jim.</p>
+
+<p><ul>
+<li>SDL_NumJoysticks()</li>
+<li>SDL_JoystickOpen()</li>
+<li>Struktura SDL_Joystick</li>
+<li>SDL_JoystickOpened()</li>
+<li>SDL_JoystickClose()</li>
+<li>SDL_JoystickName()</li>
+<li>SDL_JoystickIndex()</li>
+<li>SDL_JoystickNumAxes()</li>
+<li>SDL_JoystickNumBalls()</li>
+<li>SDL_JoystickNumHats()</li>
+<li>SDL_JoystickNumButtons()</li>
+<li>SDL_JoystickEventState()</li>
+<li>Struktura SDL_JoyAxisEvent</li>
+<li>Struktura SDL_JoyButtonEvent</li>
+<li>Struktura SDL_JoyBallEvent</li>
+<li>Struktura SDL_JoyHatEvent</li>
+<li>SDL_JoystickUpdate()</li>
+<li>SDL_JoystickGetAxis()</li>
+<li>SDL_JoystickGetButton()</li>
+<li>SDL_JoystickGetBall()</li>
+<li>SDL_JoystickGetHat()</li>
+</ul></p>
+
+
+<h2><a href="sdl_15.html">SDL #15</a> - Ostatní události</h2>
+
+<p>V dnešním dílu o knihovně SDL dokončíme popis událostního systému. Budeme se mimo jiné věnovat změnám velikosti okna, jeho aktivacím a deaktivacím, posílání uživatelských zpráv a dalším věcem, které ještě zbývá probrat.</p>
+
+<p><ul>
+<li>Struktura SDL_QuitEvent</li>
+<li>Struktura SDL_ResizeEvent</li>
+<li>Struktura SDL_ExposeEvent</li>
+<li>Struktura SDL_ActiveEvent</li>
+<li>SDL_GetAppState()</li>
+<li>Struktura SDL_UserEvent</li>
+<li>Struktura SDL_SysWMEvent</li>
+</ul></p>
+
+
+<h2><a href="sdl_16.html">SDL #16</a> - Časovače a práce s časem</h2>
+
+<p>V dnešním díle se podíváme na systémové časovače a funkce pro práci s časem. Na konci budou také v rychlosti zmíněny rychlostní optimalizace včetně výpočtu FPS.</p>
+
+<p><ul>
+<li>SDL_AddTimer()</li>
+<li>SDL_RemoveTimer()</li>
+<li>SDL_Delay()</li>
+<li>SDL_GetTicks()</li>
+</ul></p>
+
+
+<h2><a href="sdl_17.html">SDL #17</a> - Zvuky a hudba</h2>
+
+<p>V dnešním dílu o knihovně SDL začneme nový tematický celek, budou jím zvuky a hudba, které přinesou konec všem tichým aplikacím. Na první pohled by se mohlo zdát, že si musí naprostou většinu funkčnosti napsat programátor sám, nicméně je možné používat již hotový mixer v podobě rozšiřující knihovny SDL_mixer, který odstraní většinu námahy.</p>
+
+<p><ul>
+<li>SDL_AudioDriverName()</li>
+<li>Struktura SDL_AudioSpec</li>
+<li>SDL_LockAudio()</li>
+<li>SDL_UnlockAudio()</li>
+<li>SDL_OpenAudio()</li>
+<li>SDL_PauseAudio()</li>
+<li>SDL_GetAudioStatus()</li>
+<li>SDL_CloseAudio()</li>
+<li>SDL_LoadWAV()</li>
+<li>SDL_FreeWAV()</li>
+<li>SDL_MixAudio()</li>
+</ul></p>
+
+
+<h2><a href="sdl_18.html">SDL #18</a> - Konverze zvuků, knihovna SDL_sound</h2>
+
+<p>V tomto díle konverzemi zvuků dokončíme popis funkcí, které SDL poskytuje pro audio. Druhá část článku bude věnována rozšiřující knihovně SDL_sound, která slouží pro dekódování zvuků z .MP3, .MID, .OGG a dalších běžně rozšířených typů souborů.</p>
+
+<p><ul>
+<li>Struktura SDL_AudioCVT</li>
+<li>SDL_BuildAudioCVT()</li>
+<li>SDL_ConvertAudio()</li>
+<li>Knihovna SDL_sound</li>
+<li>Sound_Init()</li>
+<li>Sound_Quit()</li>
+<li>Sound_GetError()</li>
+<li>Sound_ClearError()</li>
+<li>Sound_AvailableDecoders()</li>
+<li>Struktura Sound_DecoderInfo</li>
+<li>Sound_NewSample()</li>
+<li>Sound_NewSampleFromFile()</li>
+<li>Struktura Sound_AudioInfo</li>
+<li>Struktura Sound_Sample</li>
+<li>Sound_FreeSample()</li>
+<li>Sound_Decode()</li>
+<li>Sound_DecodeAll()</li>
+<li>Sound_SetBufferSize()</li>
+<li>Sound_Rewind()</li>
+<li>Sound_Seek()</li>
+</ul></p>
+
+
+<h2><a href="sdl_19.html">SDL #19</a> - Přehrávání zvuků pomocí SDL_mixer</h2>
+
+<p>Vše, co se týká SDL audio funkcí, už máme probráno, takže se zkusíme podívat na rozšiřující knihovnu SDL_mixer. Knihovna SDL_mixer poskytuje snadno použitelné funkce pro mixování zvuků a hudby. Je vhodná obzvlášť pro ty, kterým připadá standardní SDL audio API příliš nízkoúrovňové a strohé.</p>
+
+<p><ul>
+<li>Knihovna SDL_mixer</li>
+<li>Mix_OpenAudio()</li>
+<li>Mix_CloseAudio()</li>
+<li>Mix_GetError()</li>
+<li>Mix_SetError(</li>
+<li>Mix_QuerySpec()</li>
+<li>Mix_LoadWAV()</li>
+<li>Mix_LoadWAV_RW()</li>
+<li>Mix_QuickLoad_WAV()</li>
+<li>Mix_QuickLoad_RAW()</li>
+<li>Mix_FreeChunk()</li>
+<li>Mix_VolumeChunk()</li>
+<li>Mix_AllocateChannels()</li>
+<li>Mix_Volume()</li>
+<li>Mix_PlayChannel()</li>
+<li>Mix_PlayChannelTimed()</li>
+<li>Mix_FadeInChannel()</li>
+<li>Mix_FadeInChannelTimed()</li>
+<li>Mix_Pause()</li>
+<li>Mix_Resume()</li>
+<li>Mix_HaltChannel()</li>
+<li>Mix_ExpireChannel()</li>
+<li>Mix_FadeOutChannel()</li>
+<li>Mix_ChannelFinished()</li>
+<li>Mix_Playing()</li>
+<li>Mix_Paused()</li>
+<li>Mix_FadingChannel()</li>
+</ul></p>
+
+
+<h2><a href="sdl_20.html">SDL #20</a> - Hudba a efekty</h2>
+
+<p>Ve 20. díle dokončíme popis knihovny SDL_mixer. Budeme se bavit především o hudbě a speciálních efektech, jako je nastavení rozdílné hlasitosti levého a pravého kanálu nebo simulace ztišení vlivem vzdálenosti zdroje zvuku od posluchače.</p>
+
+<p><ul>
+<li>Struktura Mix_Music</li>
+<li>Mix_LoadMUS()</li>
+<li>Mix_FreeMusic()</li>
+<li>Mix_PlayMusic()</li>
+<li>Mix_FadeInMusic()</li>
+<li>Mix_FadeInMusicPos()</li>
+<li>Mix_HookMusic()</li>
+<li>Mix_GetMusicHookData()</li>
+<li>Mix_VolumeMusic()</li>
+<li>Mix_PauseMusic()</li>
+<li>Mix_ResumeMusic()</li>
+<li>Mix_RewindMusic()</li>
+<li>Mix_SetMusicPosition()</li>
+<li>Mix_SetMusicCMD()</li>
+<li>Mix_HaltMusic()</li>
+<li>Mix_FadeOutMusic()</li>
+<li>Mix_HookMusicFinished()</li>
+<li>Mix_GetMusicType()</li>
+<li>Mix_PlayingMusic()</li>
+<li>Mix_PausedMusic()</li>
+<li>Mix_FadingMusic()</li>
+<li>Mix_SetPanning()</li>
+<li>Mix_SetDistance()</li>
+<li>Mix_SetPosition()</li>
+<li>Mix_SetReverseStereo()</li>
+<li>Mix_RegisterEffect()</li>
+<li>Mix_UnregisterEffect()</li>
+<li>Mix_UnregisterAllEffects()</li>
+<li>Mix_SetPostMix()</li>
+<li>Mix_ReserveChannels()</li>
+<li>Mix_GroupChannel()</li>
+<li>Mix_GroupChannels()</li>
+<li>Mix_GroupCount()</li>
+<li>Mix_GroupAvailable()</li>
+<li>Mix_GroupOldest()</li>
+<li>Mix_GroupNewer()</li>
+<li>Mix_FadeOutGroup()</li>
+<li>Mix_HaltGroup()</li>
+</ul></p>
+
+
+<h2><a href="sdl_21.html">SDL #21</a> - CD-ROM</h2>
+
+<p>Další oblastí knihovny SDL, kterou si popíšeme, bude API pro práci s CD-ROM. Po přečtení tohoto článku byste měli být schopni si vytvořit jednoduchý CD přehrávač, jenž zahrnuje přehrávání a pauzy, listování a pohyb ve skladbách a také vysouvání mechaniky pro vložení nového disku.</p>
+
+<p><ul>
+<li>SDL_CDNumDrives()</li>
+<li>SDL_CDName()</li>
+<li>SDL_CDOpen()</li>
+<li>SDL_CDClose()</li>
+<li>SDL_CDStatus()</li>
+<li>CD_INDRIVE()</li>
+<li>Struktura SDL_CD</li>
+<li>Struktura SDL_CDtrack</li>
+<li>FRAMES_TO_MSF()</li>
+<li>MSF_TO_FRAMES()</li>
+<li>SDL_CDPlay()</li>
+<li>SDL_CDPlayTracks()</li>
+<li>SDL_CDPause()</li>
+<li>SDL_CDResume()</li>
+<li>SDL_CDStop()</li>
+<li>SDL_CDEject()</li>
+</ul></p>
+
+
+<h2><a href="sdl_22.html">SDL #22</a> - Vícevláknové programování</h2>
+
+<p>V dnešním díle o knihovně SDL se budeme věnovat podpoře tzv. vícevláknového programování. Podíváme se na vytváření nových vláken a samozřejmě také jejich synchronizaci, která nikdy nesmí chybět.</p>
+
+<p><ul>
+<li>SDL_CreateThread()</li>
+<li>SDL_WaitThread()</li>
+<li>SDL_KillThread()</li>
+<li>SDL_ThreadID()</li>
+<li>SDL_GetThreadID()</li>
+<li>Struktura SDL_mutex</li>
+<li>SDL_CreateMutex()</li>
+<li>SDL_DestroyMutex()</li>
+<li>SDL_LockMutex()</li>
+<li>SDL_mutexP()</li>
+<li>SDL_UnlockMutex()</li>
+<li>SDL_mutexV()</li>
+<li>Struktura SDL_sem</li>
+<li>SDL_CreateSemaphore()</li>
+<li>SDL_DestroySemaphore()</li>
+<li>SDL_SemWait()</li>
+<li>SDL_SemTryWait()</li>
+<li>SDL_SemWaitTimeout()</li>
+<li>SDL_SemPost()</li>
+<li>SDL_SemValue()</li>
+<li>Struktura SDL_cond</li>
+<li>SDL_CreateCond()</li>
+<li>SDL_DestroyCond()</li>
+<li>SDL_CondWait()</li>
+<li>SDL_CondWaitTimeout()</li>
+<li>SDL_CondSignal()</li>
+<li>SDL_CondBroadcast()</li>
+</ul></p>
+
+
+<h2><a href="sdl_23.html">SDL #23</a> - SDL_RWops, SDL_Overlay + vše, na co se zapomnělo</h2>
+
+<p>V dnešním, závěrečném, díle o knihovně SDL se pokusím shrnout všechny věci, na které jsem během psaní seriálu pozapomněl popř. kterým jsem se z důvodu mé neznalosti nevěnoval pozornost. Mimo jiné se budeme věnovat SDL_RWops, YUV video overlay, nahrávání sdílených knihoven za běhu aplikace a proměnným prostředí.</p>
+
+<p><ul>
+<li>SDL_RWFromFile()</li>
+<li>SDL_RWFromFP()</li>
+<li>SDL_RWFromMem()</li>
+<li>SDL_RWFromConstMem()</li>
+<li>SDL_AllocRW()</li>
+<li>SDL_FreeRW()</li>
+<li>Struktura SDL_RWops</li>
+<li>SDL_RWread()</li>
+<li>SDL_RWwrite()</li>
+<li>SDL_RWseek()</li>
+<li>SDL_RWtell()</li>
+<li>SDL_RWclose()</li>
+<li>Struktura SDL_Overlay</li>
+<li>SDL_CreateYUVOverlay()</li>
+<li>SDL_FreeYUVOverlay()</li>
+<li>SDL_LockYUVOverlay()</li>
+<li>SDL_UnlockYUVOverlay()</li>
+<li>SDL_DisplayYUVOverlay()</li>
+<li>SDL_putenv()</li>
+<li>SDL_getenv()</li>
+<li>SDL_LoadObject()</li>
+<li>SDL_UnloadObject()</li>
+<li>SDL_LoadFunction()</li>
+<li>SDL_HasRDTSC()</li>
+<li>SDL_HasMMX()</li>
+<li>SDL_HasMMXExt()</li>
+<li>SDL_Has3DNow()</li>
+<li>SDL_Has3DNowExt()</li>
+<li>SDL_HasSSE()</li>
+<li>SDL_HasSSE2()</li>
+<li>SDL_HasAltiVec()</li>
+</ul></p>
+
+<h2><a href="sdl_24.html">SDL #24</a> - Obsah</h2>
+
+<p>Dvacátý čtvrtý díl je shrnutím celé série o multiplatformní knihovně SDL. Text je strukturován podle jednotlivých článků, u každého je uveden úvodní odstavec spolu se seznamem SDL příkazů, které v něm byly probrány.</p>
+
+
+<h2>PDF verze seriálu</h2>
+
+<p>Jako bonus na rozloučenou jsem pro všechny, kteří dočetli až sem ;-), vytvořil <a href="sdl.pdf.tar.gz">PDF verzi celého</a> seriálu vhodnou pro tisk. Mimochodem má 110 stránek!</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="sdl_24.tar.gz">Offline verze článku včetně všech příloh</a></li>
+<li><a href="sdl.pdf.tar.gz">PDF verze celého seriálu vhodná pro tisk</a></li>
+</ul></p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 28.07.2005</div>
+
+</body>
+</html>

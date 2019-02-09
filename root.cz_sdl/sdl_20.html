@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (20)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (20)</h1>
+
+<p class="perex">Ve 20. díle dokončíme popis knihovny SDL_mixer. Budeme se bavit především o hudbě a speciálních efektech, jako je nastavení rozdílné hlasitosti levého a pravého kanálu nebo simulace ztišení vlivem vzdálenosti zdroje zvuku od posluchače.</p>
+
+
+<h2>Hudba</h2>
+
+<p>Přehrávání hudby je v SDL_mixeru kompletně oddělené od normálních zvukových kanálů a tudíž musí mít své vlastní rozhraní. Hudba je reprezentován strukturou Mix_Music a stejně jako u zvuků i zde stačí znát pouze jméno, veškeré operace se provádějí pomocí API funkcí.</p>
+
+<p>Pozn.: Rozhraní zvuků a hudby si je velice podobné, a proto zkusím popis trochu urychlit. Také nemám rád copy &amp; paste články...</p>
+
+<p>Hudba se nahrává funkcí Mix_LoadMUS() a po skončení práce se uvolňuje pomocí Mix_FreeMusic().</p>
+
+<pre>
+Mix_Music *Mix_LoadMUS(const char *file);
+void Mix_FreeMusic(Mix_Music *music);
+</pre>
+
+<p>Samotné přehrávání začíná až po zavolání jedné z následujících tří funkcí. U poslední z nich se nezačíná hned od začátku, ale od libovolného místa skladby, jeho definice je ale bohužel závislá na typu zvukového souboru - viz Mix_SetMusicPosition() níže.</p>
+
+<pre>
+int Mix_PlayMusic(Mix_Music *music, int loops);
+int Mix_FadeInMusic(Mix_Music *music, int loops, int ms);
+
+int Mix_FadeInMusicPos(Mix_Music *music, int loops,
+		int ms, double position);
+</pre>
+
+<p>Další způsob, jak přehrávat hudbu, je technika ne nepodobná SDL. Je nutné napsat mixovací funkci a poté na ni předat pomocí Mix_HookMusic() do SDL_mixeru ukazatel. V callbacku nikdy nevolejte SDL_mixer funkce ani SDL_LockAudio().</p>
+
+<pre>
+void Mix_HookMusic(void (*mix_func)(void *udata,
+		Uint8 *stream, int len), void *arg);
+</pre>
+
+<p>Parametry jsou v podstatě stejné jako u SDL callback funkce, do udata se bude předávat ukazatel z arg. Ten se také dá kdykoli zjistit pomocí Mix_GetMusicHookData().</p>
+
+<pre>
+void *Mix_GetMusicHookData();
+</pre>
+
+<p>Následující tři funkce slouží pro změnu hlasitosti, pozastavení a následné obnovení přehrávání.</p>
+
+<pre>
+int Mix_VolumeMusic(int volume);
+void Mix_PauseMusic();
+void Mix_ResumeMusic();
+</pre>
+
+<p>Funkci Mix_RewindMusic() lze použít pro skok na začátek hudby, ale pracuje pouze s typy .MOD, .OGG, .MP3 a nativním .MIDI.</p>
+
+<pre>
+void Mix_RewindMusic();
+</pre>
+
+<p>Pokud je to možné, pak Mix_SetMusicPosition() skočí na libovolné místo hudby, v případě úspěchu vrátí 0, neúspěch oznamuje -1 (většinou způsobeno nepodporováním v dekodéru). Parametr position je závislý na typu zdroje, například u .OGG má význam pozice od začátku, ale u .MP3 je vztažen k aktuální pozici. Obě hodnoty jsou měřeny v sekundách.</p>
+
+<pre>
+int Mix_SetMusicPosition(double position);
+</pre>
+
+<p>Jedním z těch zajímavějších příkazů je Mix_SetMusicCMD(), který umožňuje použít pro přehrávání hudby libovolný přehrávač nainstalovaný v systému. Za parametr by měl být předán kompletní příkaz, jako kdyby se psal do příkazové řádky, na konec bude automaticky dosazeno jméno souboru s hudbou. Pro návrat zpět k internímu přehrávači stačí za parametr předat hodnotu NULL. Při úspěchu je vrácena nula, jinak -1.</p>
+
+<pre>
+int Mix_SetMusicCMD(const char *command);
+</pre>
+
+<p>Aby se dala hudba korigovat, musí daný přehrávač podporovat ovládání pomocí signálů SIGTERM (zastavení), SIGSTOP (pauza) a SIGCONT (obnovení). Změna hlasitosti nemá u externího přehrávače žádný efekt, smyčky lze implementovat opakovaným spouštěním. Tento příkaz není úplně portovatelný!</p>
+
+<p>Následující ukázka je převzata z dokumentace SDL_mixeru.</p>
+
+<pre>
+Mix_Music *music = NULL;
+
+if(Mix_SetMusicCMD("mpg123 -q") == -1)
+{
+	perror("Mix_SetMusicCMD");
+}
+else
+{
+	music = Mix_LoadMUS("music.mp3");
+	if(music)
+		Mix_PlayMusic(music, 1);
+}
+</pre>
+
+<p>Přehrávání se dá zastavit funkcemi Mix_HaltMusic() a Mix_FadeOutMusic(). Pomocí třetí uvedené funkce lze předat do SDL_mixeru ukazatel na libovolnou callback funkci daného typu, která se automaticky spustí po zastavení hudby. Opět by se v ní neměly objevit žádné SDL_mixer příkazy ani SDL_LockAudio().</p>
+
+<pre>
+int Mix_HaltMusic();
+int Mix_FadeOutMusic(int ms);
+void Mix_HookMusicFinished(void (*music_finished)());
+</pre>
+
+<p>Zdrojový formát hudby se dá zjistit voláním funkce Mix_GetMusicType(), která vrátí jednu z konstant MUS_NONE, MUS_CMD, MUS_WAV, MUS_MOD, MUS_MID, MUS_OGG, MUS_MP3. Za parametr se může předat libovolný objekt s hudbou, u NULL se předpokládá dotaz na právě přehrávanou.</p>
+
+<pre>
+Mix_MusicType Mix_GetMusicType(const Mix_Music *music);
+</pre>
+
+<p>Použití tohoto příkazu je výhodné například spolu s Mix_SetMusicPosition() a podobnými funkcemi, které se s různými typy chovají odlišně.</p>
+
+<p>A opět nezbytné funkce na dotazy...</p>
+
+<pre>
+int Mix_PlayingMusic();
+int Mix_PausedMusic();
+Mix_Fading Mix_FadingMusic();
+</pre>
+
+
+<h2>Efekty</h2>
+
+<p>Následující funkce vykonávají na audio výstupu speciální efekty. Lze je použít buď výhradně na jeden kanál, pak se za první parametr dosazuje jeho číslo, nebo na kompletní zvukový výstup, tj. všechny kanály + hudba (tzv. postefekt), k tomu slouží symbolická konstanta MIX_CHANNEL_POST.</p>
+
+<p>Je důležité si uvědomit, že používání efektů zvyšuje relativně velkou měrou náročnost aplikace. Například prohození levého a pravého stereo kanálu na výstupu za to vůbec nemusí stát, zaměnění bedniček na stole bude rozhodně efektivnější. Některé interní efekty mohou, v případě, že je definována systémová proměnná MIX_EFFECTSMAXSPEED, snížit svou náročnost, ale zároveň i kvalitu.</p>
+
+<p> Všechny funkce pro efekty vracejí při chybě nulu, už to nebude dále uváděno.</p>
+
+<p>Jedním ze základních efektů je definice rozdílné hlasitosti levého a pravého kanálu funkcí Mix_SetPanning(). Hlasitost se tentokrát specifikuje v rozmezí od 0 do 255.</p>
+
+<pre>
+int Mix_SetPanning(int channel, Uint8 left, Uint8 right);
+</pre>
+
+<p>Tento efekt pracuje výhradně ve stereo režimu. Aby byla celková hlasitost vždy stejná, je dobré označit jednu hodnotu za referenční a druhou k ní vztáhnout, jako je to ukázáno na následujícím příkladu.</p>
+
+<pre>
+// Optimální nastavení hlasitosti
+Mix_SetPanning(channel, left, 255 - left);
+</pre>
+
+<p>Předání hlasitostí 255 za obě hodnoty bude mít za následek odregistrování (vypnutí) efektu.</p>
+
+<p>Pomocí funkce Mix_SetDistance() lze simulovat změnu hlasitosti v závislosti na vzdálenosti posluchače od zdroje zvuku. Za parametr distance se dosazují hodnoty od 0 (nejblíže, nejhlasitěji) do 255 (nejdále, nejtišeji). I z největší vzdálenosti bude zvuk trochu slyšet.</p>
+
+<pre>
+int Mix_SetDistance(int channel, Uint8 distance);
+</pre>
+
+<p>Velice jednoduchý 3D zvuk lze emulovat funkcí Mix_SetPosition(). Pro parametr určující vzdálenost platí stejná pravidla, jako u Mix_SetDistance(). Úhel se definuje ve stupních v rozmezí plného úhlu, čili 360 stupňů. Číslo 0 odpovídá zvuku zepředu, 90 zprava, 180 zezadu a 270 zleva, mezihodnoty jsou samozřejmě možné, nicméně blízké hodnoty (podle dokumentace 1-7, 8-15 atd.) budou mít stejné účinky.</p>
+
+<pre>
+int Mix_SetPosition(int channel,
+		Sint16 angle, Uint8 distance);
+</pre>
+
+<p>Předáním nuly za úhel i vzdálenost se efekt odregistruje. Mimochodem, pokud hledáte komplexnější techniky pro 3D audio, můžete zkusit například knihovnu OpenAL, rozhraním se velice podobá grafické OpenGL.</p>
+
+<p>Funkcí Mix_SetReverseStereo() lze docílit prohození levého a pravého kanálu, nicméně zaměnění bedniček na stole bude mnohem méně náročné. Za flip je možné dosadit libovolnou nenulovou hodnotu, nulou se efekt odregistruje.</p>
+
+<pre>
+int Mix_SetReverseStereo(int channel, int flip);
+</pre>
+
+<p>Kromě předdefinovaných efektů, které byly právě popsány, poskytuje SDL_mixer rozhraní pro tvorbu libovolných nových. V podstatě stačí napsat dvě funkce a zaregistrovat je. Právě probrané interní efekty pracují naprosto stejným způsobem.</p>
+
+<p>První z funkcí, které je potřeba naprogramovat, vykonává samotný efekt. SDL_mixer jí bude v parametrech předávat číslo kanálu, na němž je prováděna, ukazatel na buffer se zvukovými daty, jejich délku a uživatelský parametr. Úkolem je v podstatě načíst data ze streamu, nějakým způsobem je upravit a vložit je zpět.</p>
+
+<pre>
+typedef void (*Mix_EffectFunc_t)(int chan, void *stream,
+		int len, void *udata);
+</pre>
+
+<p>Mějte na paměti, že data ve streamu už nejsou ve formátu specifikovaném v Mix_OpenAudio(), ale ve formátu zvukového zařízení, ten sice může, ale nemusí být stejný. Pro zjištění aktuálně používaného formátu slouží funkce Mix_QuerySpec().</p>
+
+<p>Druhá uživatelská funkce se volá, když kanál dokončil přehrávání, byl zastaven nebo dealokován, popř. efekt byl odregistrován. Jejím úkolem je například resetovat interní proměnné nebo uvolnit dynamickou paměť. Pokud nic z toho není potřeba, je možné předávat místo ní hodnotu NULL.</p>
+
+<pre>
+typedef void (*Mix_EffectDone_t)(int chan, void *udata);
+</pre>
+
+<p>Efekt se registruje funkcí Mix_RegisterEffect(). Předává se jí číslo kanálu, ukazatele na funkce, které budou efekt vykonávat, a ukazatel na uživatelská data. Na jeho adresu se například mohou ukládat stavové parametry.</p>
+
+<pre>
+int Mix_RegisterEffect(int chan, Mix_EffectFunc_t f,
+		Mix_EffectDone_t d, void *arg);
+</pre>
+
+<p>Efekty jsou vnitřně realizovány jako spojový seznam, při registrování se vždy vkládají na konec a vždy se spouští nad výstupy svých předchůdců. Nic nebrání tomu, aby byl jeden efekt registrován vícekrát, v takovém případě se účinky kumulují.</p>
+
+<p>Po ukončení přehrávání je vždy spojový seznam daného kanálu resetován. Při každém volání Mix_PlayChannel*() je tedy nutné všechny efekty opětovně zaregistrovat.</p>
+
+<p>Pomocí Mix_UnregisterEffect() lze libovolný efekt odregistrovat, předává se jí ukazatel na vykonávací funkci. Stejný ukazatel se hledá ve spojovém seznamu a odstraněn je vždy první nalezený výskyt, ostatní zůstávají zachovány.</p>
+
+<pre>
+int Mix_UnregisterEffect(int channel, Mix_EffectFunc_t f);
+</pre>
+
+<p>Funkce vrátí nulu například, pokud není kanál validní nebo nebyl efekt registrován. Pokud tedy chcete odregistrovat všechny efekty daného typu, není nic jednoduššího, než vložit volání této funkce do cyklu.</p>
+
+<p>Úplně všechny efekty aplikované na kanál lze odregistrovat funkcí Mix_UnregisterAllEffects(), při jakékoli chybě je opět vrácena nula.</p>
+
+<pre>
+int Mix_UnregisterAllEffects(int channel);
+</pre>
+
+<p>Funkce Mix_SetPostMix() je v podstatě analogií Mix_RegisterEffect(MIX_CHANNEL_POST, ...), ale aplikuje se až na kompletní zvukový výstup, tedy po všech efektech registrovaných klasickou cestou, smixování zvukových kanálů a hudby dohromady a všech postefektech. Ihned po vykonání se stream posílá na audio zařízení, takže pokud plánujete implementovat grafické vizualizace, jste na správném místě.</p>
+
+<pre>
+void Mix_SetPostMix(void (*mix_func)(void *udata,
+		Uint8 *stream, int len), void *arg);
+</pre>
+
+<p>Činnost callback funkce neskončí, dokud není audio zařízení zavřeno nebo není místo mixovací funkce předáno NULL.</p>
+
+
+<h2>Skupiny kanálů</h2>
+
+<p>Možná vám bude připadat seskupování kanálů relativně zbytečné, ale v některých případech se může teoreticky hodit. Díky němu lze aplikovat operace, jako je pauza nebo zastavení, na všechny kanály v dané skupině. Mimochodem s jednou skupinou jsme se už setkali, měla číslo -1 a obsahovala všechny kanály.</p>
+
+<p>Při popisu funkcí typu Mix_PlayChannel(), jsme si řekli, že se při zadání parametru -1 použije libovolný volný kanál. Funkcí Mix_ReserveChannels() se rezervují kanály, aby je nebylo možno takto náhodně vybrat.</p>
+
+<pre>
+int Mix_ReserveChannels(int num);
+</pre>
+
+<p>Za parametr se předává požadovaný počet kanálů, ty se rezervují od nuly do num-1. Předání nuly rezervaci zruší. Návratovou hodnotou je počet opravdu rezervovaných kanálů, ten může být v závislosti na počtu alokovaných menší, než je požadováno.</p>
+
+<p>Přidání kanálu do skupiny se vykoná voláním funkce Mix_GroupChannel(). První parametr označuje kanál a druhý jméno skupiny, může jím být libovolné kladné číslo včetně nuly. Opačný směr, tj. odebrání ze skupiny, se provede zadáním -1, v podstatě se kanál vloží do globální. Druhá funkce operuje nad více po sobě jdoucími kanály najednou.</p>
+
+<pre>
+int Mix_GroupChannel(int which, int tag);
+int Mix_GroupChannels(int from, int to, int tag);
+</pre>
+
+<p>První z funkcí vrací při úspěchu 1 a při neúspěchu 0, druhá počet přidaných kanálů. Počet kanálů ve skupině se dá zjistit funkcí Mix_GroupCount().</p>
+
+<pre>
+int Mix_GroupCount(int tag);
+</pre>
+
+<p>První dostupný/nehrající kanál ve skupině lze najít voláním funkce Mix_GroupAvailable(). Mix_GroupOldest() slouží pro nalezení momentálně nejdéle hrajícího kanálu a Mix_GroupNewer() hledá nejnovější.</p>
+
+<pre>
+int Mix_GroupAvailable(int tag);
+int Mix_GroupOldest(int tag);
+int Mix_GroupNewer(int tag);
+</pre>
+
+<p>V případě, že není žádný kanál nalezen je vráceno číslo -1.</p>
+
+<p>Odeznívání a následné ukončení přehrávání kanálů sdružených do skupiny lze provést pomocí Mix_FadeOutGroup(), čas se opět zadává v milisekundách. Druhá uvedená funkce způsobí okamžité zastavení.</p>
+
+<pre>
+int Mix_FadeOutGroup(int tag, int ms);
+int Mix_HaltGroup(int tag);
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Hudba a efekty</h3>
+
+<p>Program demonstruje přehrávání hudby a hlavně zabudované efekty v SDL_mixeru. Cesta k hudbě se předává jako parametr programu. Ovládání:</p>
+
+<ul>
+<li>[+/-] - hlasitost</li>
+<li>[mezerník] - prohodí levý a pravý kanál</li>
+<li>[šipka doleva/doprava] - výstup z levého/pravého kanálu</li>
+<li>[šipka nahoru/dolů] - vzdálenost od zdroje zvuku</li>
+<li>[1,2,3,4,6,7,8,9] - pozice zdroje zvuku (úhel)</li>
+</ul>
+
+<p><a href="./src/sdl_20_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h3>Zvuky ve hře</h3>
+
+<p>Program rozšiřuje ukázkový příklad ze <a href="sdl_16.html">16. dílu</a> (hra ve stylu Pacmana). Do scény jsou přidány objekty, které má hráč za úkol sbírat (reset pomocí R) a nějaké ty zvuky. Hudba je volitelná, stačí odkomentovat jedno define a nastavit cestu k libovolnému souboru. <a href="./src/sdl_20_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/20_prog_b.png" width="322" height="259" alt="Zvuky ve hře" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_20_a.tar.gz">Příklad: Hudba a efekty</a></li>
+<li><a href="./src/sdl_20_b.tar.gz">Příklad: Zvuky ve hře</a></li>
+<li><a href="sdl_20.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>To bylo ze SDL_mixeru vše, v příštím díle se budeme věnovat přehrávání hudby z CD.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 30.06.2005</div>
+
+</body>
+</html>

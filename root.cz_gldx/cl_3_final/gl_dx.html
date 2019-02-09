@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D III.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D III.</h1>
+
+<p id="uvod">Tento <b>neplánovaný</b> díl je především reakcí na diskuze k dílům minulým. Nebudu se moc věnovat věcem, jako je číslování verzí DirectX nebo omyl s DirectPlay, protože je v současné chvíli nepovažuji za podstatné. Berte ho spíše jako úvahu na téma: Jaké opravdu zásadní chyby jsem při psaní udělal... a že jich bylo dost :-(</p>
+
+
+<h3>Budou další pokračování?</h3>
+
+<p>Co se mi na root.cz opravdu líbí, je, že čtenáři píší do diskuzí. Je jedno, jestli se jedná o pochvaly, které se mě ale zrovna netýkají :-(, upozornění na chyby v článku nebo rovnou návrhy na ukončení seriálu, těch bylo povícero. Možná se vám poslední jmenované splní, zatím ještě váhám, záleží na tom, jaký budu mít pocit, až dopíši tento článek a přečtu si následnou diskuzi.</p>
+
+<p>První ze všeho bych se chtěl oficiálně omluvit Johance, která na moji blbost doplatila pravděpodobně nejvíce, protože měla spoustu práce s přípravou vydání - ne jenom s prvními dvěma díly, ale i <b>dalšími</b>, které jsem jí poslal také. Promiň.</p>
+
+<p>Své práce s psaním tohoto seriálu nelituji. I když to tak nevypadá, naučil jsem se spoustu nových věcí, především, že nic není dokonalé - viz dále v průběhu článku. Lituji spíše toho, že jsem si během dvou týdnů kompletně zlikvidoval svou pověst, kterou jsem pracně budoval přes tři roky :-(</p>
+
+
+<h3>Úvaha na úvod</h3>
+
+<p>Začnu citací z diskuze k prvnímu dílu: <i>Pamatuju se jak mi kamaradi, kteri me ucili programovat grafiku vzdycky rikali. Pokud neumis programovat v directX a openGL stejne nikdy nekritizuj ten ktery API :)</i></p>
+
+<p>Jo, už to chápu taky, škoda, že až teď. Myslel jsem si, že čtyř set stránková knížka o Direct3D by měla stačit, ale asi opravdu nebyla zrovna kvalitní. Číst o něčem a prakticky to používat, je obrovský rozdíl. Zkrátka, nepřesvědčila mě, proč přejít na Direct3D, spíš o tom, proč na něj nepřejít, a v tomto duchu jsem začal psát i seriál. Uznávám, že záleží především na programátorovi, co umí a co si vybere... nicméně nějaké znalosti tam přeci jen byly. Asi jsem neměl zrovna psát, že budu &quot;vařit z vody&quot;.</p>
+
+<p>Teď už chápu, že DirectX nebude až tak špatné, jak jsem si původně myslel. Dožral mě především autor zmiňovaného článku o UT 2004 a právě tím mě nasměroval ke &quot;kydání na DX&quot;. Věřte nebo ne, opravdu se mi něco takového moc často nestává.</p>
+
+<p>Ale představte si tu situaci a opravte mě jestli se mýlím (výzva především k autorovi čl. UT 2004). Úmyslně píši do uvozovek... &quot;Přes dva roky překládám po večerech OpenGL Tutoriály (350 stran A4 !!!) a pak si přečtu článek nějakého pařana, který o DirectX a OpenGL ví jen to, že existujou a bez nejzákladnějších znalostí dojde k závěru, že OpenGL je totální sh... zaručeně horší.&quot;</p>
+
+<p>Po závěrečném čtení: Když tak uvažuji nad tím, co jsem před chvílí napsal, stalo se mi úplně to samé :-(. Ale čestně, co byste udělali vy? Zkusili byste alespoň napsat do diskuze, nebo byste si jen pomysleli: &quot;Je to magor, ale ať mu to řekne někdo jinej.&quot;? Po pravdě, mě jste to řekli a děkuji vám za to.</p>
+
+<p>Dále pokusím o rychlé srovnání OpenGL a DirectX (opět), které by teď už mělo být alespoň trochu vypovídající. Doufám, že nezačnu opět žádné bludy.</p>
+
+
+<h3>Proč ne Direct3D</h3>
+
+<p>Vezmu si jeden modelový objekt (sebe) a vše popíši na něm.</p>
+
+<p>První a hlavní důvod je ten, že jsem se cca. před rokem rozhodl řídit heslem nepokradeš a opustil Windows. Příčinou bylo přečtení rozhovoru s Billem Gatesem, který zmínil něco ve smyslu, že pokud by všichni používali legální software, tak by měl Microsoft dostatek peněz na opravení snad všech chyb ve Windows. Řídil jsem se přesně jeho výzvou a zahodil všechna nelegální CD s programy. Někdy mi připadá jako paradox, že používáním GNU/Linuxu defakto poskytuji Microsoftu prostředky na vývoj Windows, ale přesně tak to je :-)</p>
+
+<p>Pokud jste to z minulého odstavce nepochopili, DirectX nefunguje v Linuxu. Nefunguje dokonce ani v Mac OS a ani ve Free/Net/Open-BSD, BeOSu a všech dalších ne-Win* operačních systémech. Funguje jen a pouze pod MS Windows. Určitě chápete, že mi to, jako uživateli Linuxu, nemusí až tak úplně stačit. U OpenGL tento problém kompletně odpadá, funguje snad všude. Když není dostupné DirectX, je to prakticky jediná volba. Někdy tak uvažuji, jestli by se Microsoft vůbec vzpamatoval a nezkrachoval by, kdyby většina lidí, přestala Windows používat. Všimli jste si taky těch v poslední době neustále přibývajících reklam v počítačových časopisech...?</p>
+
+<p>Jako druhý důvod lze zmínit můj &quot;osobní odpor&quot; ke všemu, co nese označení Microsoft. Nejsem si až tak jistý, jak u mě vznikl, prostě je. Častými pády programů této firmy jsem prostě ztratil důvěru ke všem novým verzím, které za několik let vývoje přidají nové grafické efekty a opraví staré chyby. Prosím, v diskuzi na toto nereagujte.</p>
+
+<p>Říká se, že Microsoft má monopol na spoustu věcí týkající se IT, ale dokud si ho nedosadíte za šelmu do Janovy Apokalypsy nebo za Velkého bratra do románu 1984 od George Orwella, nemyslím, že budete mít mrazení v zádech a neurčité pocity obav... ale teď už opravdu odbíhám od hlavního tématu.</p>
+
+<p>Třetím důvodem je, že mi OpenGL prostě vyhovuje a nemám potřebu se učit spoustu nových a naprosto odlišných věcí, o kterých si nejsem až tak jistý, jestli by mi byly vůbec k něčemu. Za dobu, co se věnuji 3D grafice, jsem potkal pouze jednoho člověka, který přešel z OpenGL na DirectX, druhým směrem jich ale šlo asi dvacet - no, deset určitě. Ale máte pravdu, nemůžu znát každého, zvlášť z DX strany plotu.</p>
+
+<p>Ona osoba, kterou jsem zmínil v předchozím odstavci, uvedla jako hlavní a prakticky jediný důvod pro přechod tzv. lepší podporu. Nepochopil jsem, co to znamená, ale když jsem tohle slovo slyšel ve spojení s Microsoftem napadlo mě něco jako gigantická reklama, používají to všichni, tak to musí být dobré a v čem je to opravdu lepší? Na to poslední měl odpovědět tento seriál, ale moc se mu to nepovedlo :-(</p>
+
+<p>Abych to shrnul, asi jste si všimli, že se jedná především o varování vnitřního hlasu. Někomu stačit nemusí, mě ano. Nemám žádný pádný důvod, proč bych neměl přejít a pokud nebude, o programování v DirectX se pokoušet nebudu. Jediné, co by mě mohlo přemluvit, by byla možnost pracovat v nějaké programátorské společnosti, která preferuje výhradně DirectX, pak bych začal uvažovat, ale v současnosti zkrátka nemám důvod...</p>
+
+
+<h3>V čem je Direct3D lepší než OpenGL</h3>
+
+<p>Asi nejmarkantnější výhoda Direct3D oproti OpenGL je přítomnost ostatních DX knihoven pro zvuky, síťování ad., které dohromady vytvářejí jeden ucelený balík čili DirectX SDK (jmenuje se to tak?). Pokud kódujete počítačové hry, máte k dispozici na jednom místě snad všechno, co potřebujete a nemusíte po internetu složitě hledat, jak loadovat a vykreslit 3ds model (Umí Direct3D i tohle? Jestli ano, opravdu respekt :-), nahrát jpg obrázek, naprogramovat multiplayer, přehrát empétrojku a podobně. Podle mého názoru se ve (Windows) hrách rozšířilo právě a především z tohoto důvodu.</p>
+
+<p>OpenGL je jen a pouze pro rendering, vše ostatní musíte vytvořit jinými nástroji jako jsou SDL a jeho podknihovny (SDL_image, SDL_sound, SDL_net, SDL_mixer...) určené především pro tvorbu počítačových her, OpenAL nebo FMOD na zvuky a další, které ovšem ne každý zná (slyšel o nich) a umí je používat.</p>
+
+<p>Na druhou stranu, budeme-li na chvíli ignorovat hry a podíváme-li se na nástroje typu Blender, 3D Studio Max, Mayu, Solid Works a další, i v dnešních dobách OpenGL jasně vede - k čemu by v těchto programech byly zvuky nebo multiplayer? Poznámka pro šťouraly: Ano, Direct3D se v současnosti začíná dostávat i do této oblasti.</p>
+
+<p>Argument, že DirectX používá v současnosti cca. 99 procent všech nových her, je sice pravdivý, ale nic neříká o tom, jestli je D3D opravdu lepší než OpenGL. Tím bych se jako zastánce D3D určitě nevytahoval. Mohly by se napsat desítky/stovky analogických příkladů, ale většina z nich by nebyla naprosto jednoznačná - typicky Windows s Linuxem ap.</p>
+
+<p>Z diskuze si půjčím příklad MS IE a Mozilly, který považuji za hodně názorný. Naprostá většina tzv. kancelářských uživatelů si myslí, že internet = prohlížeč MS IE a absolutně nedokáží pochopit, že se na web dá dostat i pomocí jiných programů - např. u mojí mámy to byly i po ukázce Opery tři hodiny zoufalého vysvětlování, počítač i net používá denně :-(. Nedávno mě při rozhovoru o prohlížečích s jedním učitelem, kterého si vážím a který o počítačích ví opravdu hodně, dostalo, že rozhovor o IE, Mozille a Opeře završil tím, že používá MyIE. Hlavní argument: Je založeno na MS IE, takže zobrazuje všechno stejně jako MS IE. Asi největší úlet, jaký jsem od něj kdy slyšel. Někdy mě baví vkládat do kaskádových stylů nekončící komentáře /*nefunguje v IE*/. Promiňte, opět odbíhám od tématu.</p>
+
+<p>Objektová architektura může být výhodou a zároveň i nevýhodou. Výhodou je, že se scéna může organizovat do hierarchických bloků (padlo to v diskuzi, nevím, ale je to logické). Nevýhodou oproti strukturálnímu OpenGL může být složitější napojení na nejrůznější programovací jazyky a především mnohem náročnější učení (po nějaké době odpadá).</p>
+
+<p>Nevýhodu bych spatřoval především v &quot;OOP na bázi COM&quot;. V žádném případě neznamená, že objektové programování = nepřenositelný program, nicméně ve spojení s COM bohužel ano. Dobře napsaný OOP program bývá přehlednější, robustnější a sndněji modifikovatelnější než strukturovaný, o špatně napsaném OOP programu se nebudu vyjadřovat, myslím, že každý jsme vytvořili minimálně jeden, ale spíše mnohem víc. Jestli je DirectX dobrý nebo špatný OOP nedokáži objektivně posoudit, ve srovnání s OpenGL vidím především ty nevýhody.</p>
+
+<p>Lidé kteří zkoušejí Direct3D na jeho objekty nadávají a lidé, kteří zkoušejí OpenGL, zase chtějí, aby bylo objektové - co si vybrat? Mě osobně strukturální OpenGL naprosto vyhovuje, asi proto, že jsem na něj zvyklý, objekty mi připadají jako zbytečné komplikace. Mimochodem na COM, ActiveX a další technologie mám hodně negativní názor, takže raději bez komentáře.</p>
+
+<p>Další výhodou Direct3D může být, že se přímo do něj neustále přidávají nové funkce, u nichž není vůbec podstatné, jestli je grafická karta podporuje. Pokud ne, mohou se bez nejmenších požadavků na programátora aplikovat softwarově, v OpenGL se musí o nepřítomnost efektu (extensionu) starat výhradně programátor. Je otázkou, jestli se při kompletní softwarové emulaci nějakého efektu nestane hra natolik trhanou, že bude nehratelná (nemám zkušenosti).</p>
+
+<p>U OpenGL se jakákoli supermoderní novinka zprovozňuje přes extensiony, ty ale také mají své plusy i mínusy. Pozitivní je, že se jakýkoli efekt může použít naprosto ihned po vydání karty a bez opětovného měnění základního standardu, jaké lze vidět u D3D (teď myšleno přidávání nových funkcí, ne změny stávajícího rozhraní).</p>
+
+<p>Nevýhodou je, že pokud se rozšířením nevěnujete denně, ale pouze občas - spíše vůbec, máte v nich naprostý zmatek a nepoužíváte je, popř. používáte pouze malý zlomek z nich (můj případ). To, co mi na nich vadí nejvíce, je tedy jejich počet - odhaduji cca. 300 a neustále roste :-(. Naproti tomu, každá nová verze DirectX je ucelený balík, který &quot;extensiony obsahuje bez toho, že se chovají jako extensiony&quot;. Logicky vzato DirectX s každou novou verzí narůstá také a programátor se musí novinkám věnovat úplně stejně jako novým OpenGL extenzionům. Mám pravdu nebo je to jenom blud?</p>
+
+<p>Teď zapomeňte na DirectX, budu popisovat pouze OpenGL. Jistý příspěvek do diskuze: <i>Takze OpenGL je vlastne jen maly jadro funkcionality plus milion nekompatibilnich rozsireni, ktery se lisej od implementace k implementaci? To je fakt ohromna vyhoda :)</i> Ne, v žádném případě. Procesory CISC a RISC jsou dobrý příklad. CISC (Classic Instruction Set Computer) typicky implementuje instrukce na naprosto všechno, co si jen dokáže výrobce představit. RISC (Reduced Instruction Set Computer) jde naprosto opačnou cestou - implementuje pouze několik základních instrukcí a jejich kombinacemi umí provést úplně všechno, co CISC. Přestože je nyní jedna instrukce nahrazená za deset podinstrukcí a vykonání zabere desetkrát více času, jsou RISC mnohem výkonnější.</p>
+
+<p>Jde o to, že cca. 20% všech instrukcí CISC (sčítání, odčítání, porovnání...) se vyskytuje v kódu v 80% všech případů a zbývajících 80% instrukcí (multimedia ap.) se využívá ve 20% - tzv. zákon osmdesát dvaceti, dvacet osmdesáti. Základní OpenGL standard by se teoreticky dal přirovnat k RISC procesoru, OpenGL s extensiony k CISC, ale neberte to úplně doslova, jedná se o úplně něco jiného. Spousta grafických efektů (vertex a fragment shadery ap.) jsou natolik náročné, že implementovat je podinstrukcemi (softwarově) by bylo absolutně nereálné. Extensiony jsou v uvozovkách bonus, do kterého se sahá spíše výjimečně (těch 20% případů, spíše mnohem méně), které ale umí až neskutečné věci.</p>
+
+
+<h3>Chyby a nepřesnosti z minulých dílů</h3>
+
+<p>První a celkem velká je, že neexistuje nic s názvem DirectNet. Tento termín byl použit v literatuře, ze které jsem čerpal, ale máte pravdu, měl jsem si to ověřit. V diskuzi se pak objevilo jméno DirectPlay.</p>
+
+<p>Číslování verzí DirectX: I když v současnosti existuje DirectX 9.0(plus něco na konci), není jich devět, ale méně/více. Některá čísla byla přeskočena a naopak bylo několik podverzí. Člověku, který nezačal na DirectX 1.0, by mělo podle mého názoru určení devíti verzí postačovat, ale díky, že jste mě opravili.</p>
+
+<p>Nekompatibilita jednotlivých verzí DirectX: Osobně s tímto nemám žádné zkušenosti, ale když to řekne devět a půl člověka z deseti lidí :-) Podle toho, co jsem slyšel, přišlo téměř v každé nové verzi mnoho zlomových úprav, nicméně v tuto chvíli nedokáži posoudit, jestli je to pravda nebo ne. Rozhraní knihoven by se obecně nemělo nikdy měnit - maximálně ve zlomových verzích, např. chystané OpenGL 2.0. Upřímně, kterou verzi (verze) DirectX byste označili jako podobně zlomové?</p>
+
+<p>Objektové DirectX: Neznám přesnou definici, ale za OOP jsem si vždy dosazoval slova jako třídy, objekty, metody, atributy a další věci, což DirectX určitě má. Každý člověk, který je trochu při smyslech, určitě chápe, že když se někde používají klíčová slova jako class ap., tak je označení OOP více než přiléhavé. Co lidi někdy nevygenerují... smajlík-nechápavého-kroucení-hlavou-).</p>
+
+<p>Porovnání délky kódu ve druhém dílu :-((((( Asi jen tolik, že jsem byl totální magor, když jsem se do něčeho takového pouštěl. Ukázkový příklad nebyl reálný. Zapomenout by na něj asi nešlo, že?</p>
+
+<p>Co se týče kontroly chyb při volání glVertex*(), které se nachází mimo glBegin/glEnd. Nevím, jak vy, ale na tento problém jsem ještě nikdy nenarazil a to i když jsem za dobu u OpenGL procházel zdrojáky od spousty naprostých začátečníků. Manuálové stránky (man glVertex) udávají, že &quot;Invoking glVertex outside of a glBegin/glEnd pair results in undefined behavior&quot;, takže pokud se správně pochopí slovní spojení nedefinované chování, je to jednotné naprosto na všech platformách :-), ale máte pravdu, jednotnější způsob by byl lepší. Kompilátor tuto chybu sice neodhalí, ale programátor s tím nemá absolutně žádné problémy. Toto téma patří spíše do teoretické roviny.</p>
+
+<p>Troufám si říct, že OpenGL kód byl naprosto korektní, stejně jako jeho Direct3D verze. Chybové testy byly v celé knize o Direct3D doporučovány, jsou tedy nutné nebo ne?! U OpenGL bych řekl, že spíše ne, možná výjimečně, ale určitě je naprosto zbytečné testovat každé glVertex*() a glColor*(), jestli proběhlo v pořádku - absolutní blbost.</p>
+
+<p>U OpenGL renderingu jsem vertex arrays sice použít mohl, ale nepoužil. Jak už bylo mnohokrát zmíněno programování v OpenGL a DirectX se ve své podstatě hodně liší, cílem byl ekvivalentní grafický efekt NE zdrojový kód ...nebo posloupnost vygenerovaných jedniček a nul :-)</p>
+
+<p>Mohl bych pokračovat dál, ale článek začíná hodně narůstat.</p>
+
+
+<h3>Závěr</h3>
+
+<p>Abych to nějak zakončil, další pokračování určitě nebudou - Johance a vlastně všem čtenářům se ještě jednou omlouvám. Při psaní tohoto článku jsem pochopil, že na porovnání OpenGL a DirectX prostě nemám (konečně?). Pokud si myslíte, že vy ano, můžete to zkusit, ale nedoporučuji...</p>
+
+<p>I s ultra gigantickými znalostmi skončíte vždy jako ten špatný. U mě to sice bylo z větší části způsobeno mými neznalostmi Direct3D, ale existuje spousta odborníků např. na Windows i Linux, kteří se je pokoušeli veřejně porovnat a v důsledku toho, je přestaly uznávat obě strany. Jediné, co vám mohu slíbit je, že v budoucnu budu psát (pokud budu psát, ještě nevím) už jenom o tom, co opravdu ovládám a prakticky používám.</p>
+
+<p>Na požádání - WOQ (zavináč) seznam.cz - vám můžu (<strong>pro osobní potřebu!</strong>) zaslat i další díly, které sice byly napsány, ale nevyjdou. Mazat se mi je nechce, byla na nich spousta práce. Čtení pouze na vlastní nebezpečí. Je to ve formátu HTML, ještě před rozsekáním na jednotlivé díly, které jsem pak poslal Johance, cca. 2 MB.</p>
+
+<p>Závěrečná poznámka: Kdybych napsal tento článek jako první a zároveň poslední díl série, jak byste ho vzali?</p>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

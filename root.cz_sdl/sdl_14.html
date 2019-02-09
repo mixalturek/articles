@@ -1,0 +1,346 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (14)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (14)</h1>
+
+<p class="perex">Joysticky, kniply, páky a jiné ovladače bývají nedílnou součástí většiny her, hlavně simulátorů. Tento díl bude věnován právě jim.</p>
+
+
+<p>Upozornění: Hned na začátku je potřeba říct, že jsem nikdy s žádným joystickem nepracoval a nemám ho ani k dispozici! Protože je však nedílnou součástí SDL, mělo by mu nějaké místo být věnováno. Vše, co zde tedy bude napsáno, vychází výhradně ze SDL dokumentace a bohužel není z mé strany žádným způsobem ověřeno.</p>
+
+
+<h2>Příprava Joysticku pro použití</h2>
+
+<p>Základním předpokladem, aby mohl být joystick v aplikaci používán, je předání symbolické konstanty SDL_INIT_JOYSTICK do parametrů funkce SDL_Init(), která inicializuje SDL.</p>
+
+<p>Dalším důležitým krokem přípravy je dotaz, kolik joysticků je připojeno k počítači. SDL k tomu poskytuje funkci SDL_NumJoysticks(), její návratovou hodnotou je samozřejmě daný počet.</p>
+
+<pre>
+int SDL_NumJoysticks(void);
+</pre>
+
+<p>Víme-li, že je k počítači alespoň jeden joystick připojen, lze přistoupit k jeho otevření, které se vykoná voláním funkce SDL_JoystickOpen().</p>
+
+<pre>
+SDL_Joystick *SDL_JoystickOpen(int device_index);
+</pre>
+
+<p>Za parametr se předává index joysticku, což je v podstatě jeho pořadí v systému. Hodnoty mohou být pouze v rozmezí 0 až SDL_NumJoysticks()-1. Pomocí tohoto čísla bedeme také joystick identifikovat při zpracování událostí, ale o tom až později.</p>
+
+<p>Návratovou hodnotou funkce je ukazatel na objekt struktury SDL_Joystick, který budeme předávat do všech joystickových funkcí, v případě neúspěchu pak NULL.</p>
+
+<p>Kdekoli v aplikaci může být vznesen dotaz, zda je joystick otevřen nebo ne. Slouží k tomu funkce SDL_JoystickOpened(), která, je-li otevřen, vrátí jedničku, jinak nulu.</p>
+
+<pre>
+int SDL_JoystickOpened(int device_index);
+</pre>
+
+<p>Po skončení práce by měly být uvolněny všechny zdroje, které aplikace alokovala, to samé platí i pro joysticky.</p>
+
+<pre>
+void SDL_JoystickClose(SDL_Joystick *joystick);
+</pre>
+
+<p>Následující příklad demonstruje obecnou inicializaci joysticku.</p>
+
+<pre>
+// Globální proměnná
+SDL_Joystick *g_joy = NULL;
+
+// Inicializace
+SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
+
+// Je vůbec nějaký joystick dostupný?
+if(SDL_NumJoysticks() > 0)
+{
+	// Pokud ano, jeden otevře
+	g_joy = SDL_JoystickOpen(0);
+
+	if(g_joy == NULL)
+		fprintf(stderr, "Nepodařilo se otevřít joystick.\n");
+}
+
+// Deinicializace
+if(g_joy != NULL)
+	SDL_JoystickClose(g_joy);
+</pre>
+
+
+<h2>Informace o otevřeném joysticku</h2>
+
+<p>K získání jména joysticku slouží funkce SDL_JoystickName(), která vrací řetězec ukončený NULL. Jelikož se za parametr předává pouze index zařízení, lze tuto funkci volat ještě před vlastním otevřením joysticku. Není-li žádné jméno dostupné, je vráceno NULL.</p>
+
+<pre>
+const char *SDL_JoystickName(int device_index);
+</pre>
+
+<p>Index zařízení se z joystickové struktury získá funkcí SDL_JoystickIndex().</p>
+
+<pre>
+int SDL_JoystickIndex(SDL_Joystick *joystick);
+</pre>
+
+<p>Pomocí následujících čtyř funkcí se provádí dotazy na technické parametry daného joysticku. Funkce vrací po řadě počet os (páka), trackballů, kloboučků (POV Hat) a tlačítek.</p>
+
+<pre>
+int SDL_JoystickNumAxes(SDL_Joystick *joystick);
+int SDL_JoystickNumBalls(SDL_Joystick *joystick);
+int SDL_JoystickNumHats(SDL_Joystick *joystick);
+int SDL_JoystickNumButtons(SDL_Joystick *joystick);
+</pre>
+
+<p>V následujícím příkladu otevřeme první joystick a vypíšeme o něm do konzole všechny informace, které se dají zjistit.</p>
+
+<pre>
+SDL_Joystick *joy;
+
+if(SDL_NumJoysticks() > 0)
+{
+	// Otevře první joystick
+	joy = SDL_JoystickOpen(0);
+
+	if(joy)
+	{
+		printf("Joystick #0\n");
+		printf("Jméno: %s\n",
+			SDL_JoystickName(0));
+		printf("Počet os: %d\n",
+			SDL_JoystickNumAxes(joy));
+		printf("Počet kloboučků: %d\n",
+			SDL_JoystickNumHats(joy));
+		printf("Počet trackballů: %d\n",
+			SDL_JoystickNumBalls(joy));
+		printf("Počet tlačítek: %d\n",
+			SDL_JoystickNumButtons(joy));
+	}
+	else
+		printf("Nelze otevřít joystick #0\n");
+
+	// Zavře joystick
+	if(SDL_JoystickOpened(0))
+		SDL_JoystickClose(joy);
+}
+</pre>
+
+<p>Pokud by bylo potřeba získat informace o všech joysticích v systému, není problém vložit tento kód do cyklu.</p>
+
+
+<h2>Události joysticku</h2>
+
+<p>Události joysticku jsou implicitně vypnuty, a proto, aby se jejich doručování povolilo, je nutné zavolat funkci SDL_JoystickEventState(). Za její parametr může být předána jedna ze symbolických konstant SDL_QUERY, SDL_ENABLE popř. SDL_IGNORE.</p>
+
+<pre>
+int SDL_JoystickEventState(int state);
+</pre>
+
+<p>Každá z jednotlivých částí joysticku má přiřazenu vlastní událost. Jedna pro pohyb pákou, jedna pro tlačítka, další pro trackball a ještě jedna pro klobouček - celkem čtyři události. Asi nejlepší bude, když půjdeme popořadě.</p>
+
+
+<h3>Osa (páka) - SDL_JoyAxisEvent</h3>
+
+<p>Pokud je parametr event.type události nastaven na hodnotu SDL_JOYAXISMOTION, jedná se o pohyb pákou. Další informace se pak hledají v parametru event.jaxis, což je objekt struktury SDL_JoyAxisEvent.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 which;
+	Uint8 axis;
+	Sint16 value;
+} SDL_JoyAxisEvent;
+</pre>
+
+<p>Jak brzy uvidíme, je parametr which přítomen u všech joystickových zpráv, jedná se o index joysticku, na kterém událost nastala. Axis představuje index osy, na většině moderních zařízení je osa x reprezentována nulou a y jedničkou. Value udává aktuální polohu páky, je to číslo v rozmezí od -32768 do 32767.</p>
+
+
+<h3>Tlačítka - SDL_JoyButtonEvent</h3>
+
+<p>Další joystickovou událostí, kterou SDL poskytuje, je stisk respektive uvolnění některého z tlačítek. Parametr type v takovém případě obsahuje buď hodnotu SDL_JOYBUTTONDOWN, nebo SDL_JOYBUTTONUP a objekt v SDL_Event má jméno event.jbutton.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 which;
+	Uint8 button;
+	Uint8 state;
+} SDL_JoyButtonEvent;
+</pre>
+
+<p>Proměnná button opět obsahuje index tlačítka a state může být nastaveno na SDL_PRESSED nebo SDL_RELEASED. Tato informace už však byla získána z parametru type.</p>
+
+
+<h3>Trackball - SDL_JoyBallEvent</h3>
+
+<p>Další část joysticku, která může generovat události, je trackball. Jméno zprávy je nastaveno na SDL_JOYBALLMOTION a informace se hledají v event.jball, proměnné struktury SDL_JoyBallEvent.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 which;
+	Uint8 ball;
+	Sint16 xrel, yrel;
+} SDL_JoyBallEvent;
+</pre>
+
+<p>Parametr ball označuje index trackballu a xrel spolu s yrel udává relativní pohyb na osách x a y. Absolutní pozici nelze, kvůli obecné podstatě trackballu, získat.</p>
+
+
+<h3>Klobouček - SDL_JoyHatEvent</h3>
+
+<p>Událost kloboučku má jméno SDL_JOYHATMOTION a informace jsou uloženy v event.jhat.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 which;
+	Uint8 hat;
+	Uint8 value;
+} SDL_JoyHatEvent;
+</pre>
+
+<p>V parametru hat je analogicky index kloboučku a value obsahuje pozici. Jedná se o binárně ORovanou kombinaci následujících symbolických konstant. Jejich význam je jistě každému jasný.</p>
+
+<pre>
+SDL_HAT_CENTERED
+SDL_HAT_UP
+SDL_HAT_RIGHT
+SDL_HAT_DOWN
+SDL_HAT_LEFT
+</pre>
+
+<p>Dále mohou být použity také předdefinové kombinace.</p>
+
+<pre>
+#define SDL_HAT_RIGHTUP		(SDL_HAT_RIGHT|SDL_HAT_UP)
+#define SDL_HAT_RIGHTDOWN	(SDL_HAT_RIGHT|SDL_HAT_DOWN)
+#define SDL_HAT_LEFTUP		(SDL_HAT_LEFT|SDL_HAT_UP)
+#define SDL_HAT_LEFTDOWN	(SDL_HAT_LEFT|SDL_HAT_DOWN)
+</pre>
+
+
+<h2>&quot;Přímý&quot; přístup</h2>
+
+<p>Další možností, jak přistupovat k joysticku, jsou, stejně jako u myši nebo klávesnice, přímé dotazy na jeho stav. Mimochodem, na mnoha místech SDL dokumentace se objevují poznámky, že je lepší preferovat události.</p>
+
+<p>Pokud nejsou zapnuté joystickové události, je nutné pro získání informací volat funkci SDL_JoystickUpdate(), která aktualizuje stav všech částí všech připojených joysticků. Při událostním systému je volána automaticky.</p>
+
+<pre>
+void SDL_JoystickUpdate(void);
+</pre>
+
+
+<h3>Osa (páka)</h3>
+
+<p>Pro zjištění polohy páky slouží funkce SDL_JoystickGetAxis(). Za první parametr se předává ukazatel na strukturu joysticku - toto je obecné pravidlo všech funkcí pro přímý přístup.</p>
+
+<pre>
+Sint16 SDL_JoystickGetAxis(SDL_Joystick *joystick, int axis);
+</pre>
+
+<p>Druhý parametr specifikuje index osy a návratovou hodnotou je její pozice. Někdy může být nutné počítat s jistou tolerancí, která padá na účet chvění. Je zajímavé, že některé joysticky používají osy 2 a 3 coby extra tlačítka.</p>
+
+<p>Následující příklad je opět přebrán ze SDL dokumentace, je v něm ukázáno, jak podle polohy páky určit směr pohybu.</p>
+
+<pre>
+Sint16 x_move, y_move;
+SDL_Joystick *joy1;
+
+// Inicializace joy1...
+
+x_move = SDL_JoystickGetAxis(joy1, 0);
+y_move = SDL_JoystickGetAxis(joy1, 1);
+</pre>
+
+
+<h3>Tlačítka</h3>
+
+<p>Druhým parametrem funkce SDL_JoystickGetButton() je možné specifikovat tlačítko, jehož stav potřebujeme zjistit. Je-li stisknuto, vrátí funkce jedničku a pokud ne, nulu.</p>
+
+<pre>
+Uint8 SDL_JoystickGetButton(SDL_Joystick *joystick, int button);
+</pre>
+
+
+<h3>Trackball</h3>
+
+<p>Následující funkcí lze zjistit relativní pohyb trackbalu, hodnoty se vždy vztahují k minulému volání. V případě úspěchu je vrácena nula, jinak -1.</p>
+
+<pre>
+int SDL_JoystickGetBall(SDL_Joystick *joystick,
+		int ball, int *dx, int *dy);
+</pre>
+
+<p>V příkladu níže se program pokusí zjistit přírůstky relativní pozice trackballu a následně je vypsat na terminál.</p>
+
+<pre>
+int delta_x, delta_y;
+SDL_Joystick *joy;
+
+SDL_JoystickUpdate();
+
+if(SDL_JoystickGetBall(joy, 0, &amp;delta_x, &amp;delta_y) == -1)
+	printf("Chyba při čtení trackballu!\n");
+else
+	printf("Trackball delta - X:%d, Y:%d\n",
+			delta_x, delta_y);
+</pre>
+
+
+<h3>Klobouček</h3>
+
+<p>Ke kloboučku se přistupuje funkcí SDL_JoystickGetHat(). Její návratovou hodnotou je kombinace symbolických konstant, které už byly popsány u událostí.</p>
+
+<pre>
+Uint8 SDL_JoystickGetHat(SDL_Joystick *joystick, int hat);
+</pre>
+
+
+<h2>Force Feedback</h2>
+
+<p>Force Feedback bohužel není v současné době podporován. SDL dokumentace uvádí, že Sam Lantinga &lt;slouken@libsdl.org&gt; (autor SDL) snažně prosí osoby, které mají s těmito technikami nějaké zkušenosti, o nápady, jak co nejlépe navrhnout API.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<p>Jak jsem psal na začátku, s joysticky nemám naprosto žádné zkušenosti. Navíc žádný nevlastním, a proto, i kdybych něco stvořil, nedokázal bych ověřit funkčnost a případně program odladit. Z tohoto důvodu nebude tento díl obsahovat žádný ukázkový program :-(</p>
+
+<p>Nicméně jeden můj kamarád, Ladislav Zima, je lídrem nezávisleho herního vývojového týmu <a href="http://zimtech.ceskehry.cz/">Zimtech</a>. Ve hře <a href="http://zimtech.ceskehry.cz/hotove.html">Becher Rescue</a> ovládání pomocí joysticků implementoval, takže pokud máte chuť, není nic snazšího, než nahlédnout do zdrojových kódů (GNU GPL). Jedná se o soubor main.cpp, od řádku 73.</p>
+
+<p>Tímto bych mu chtěl také veřejně poděkovat za přečtení článku a upozornění na největší chyby, jichž jsem se dopustil.</p>
+
+<p>Události joysticku/gamepadu se v Becher Rescue mapují na zpracování událostí klávesnice. Pokud je pozice páky mimo &quot;mrtvou zónu&quot; (dead-zone - joysticky jako analogová zařízení se nedrží přesně v nule, ale pozice páky se lehce &quot;klepe&quot; okolo ní), jakoby zmáčkne příslušné tlačítko na klávesnici pro pohyb postavy. Ignoruje se tedy vzdálenost páky od středu.</p>
+
+<p>Ještě jedna poznámka: na mnoha joysticích a gamepadech se neposílá událost uvolnění tlačítka, takže s tím počítejte. V Becher Rescue se zmáčknutí tlačítka joysticku převede na zvednutí a opětovné stisknutí příslušné klávesy panáčka.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="sdl_14.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>V příštím díle budou probrány všechny ostatní SDL události a tím bude tento tematický celek ukončen.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 01.05.2005</div>
+
+</body>
+</html>

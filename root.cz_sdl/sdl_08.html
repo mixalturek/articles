@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (8)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (8)</h1>
+
+<p class="perex">Díky přímé podpoře OpenGL umožňuje SDL renderovat i 3D grafické objekty, které se staly nepsaným standardem naprosté většiny dnešních her. Tentokrát se tedy budeme věnovat podpoře OpenGL v SDL.</p>
+
+
+<h2>Okno s podporou OpenGL</h2>
+
+<p>Ve čtvrtém dílu bylo ukázáno, že jediným rozdílem mezi vytvořením &quot;klasického&quot; okna a okna s podporou OpenGL je symbolická konstanta SDL_OPENGL (respektive SDL_OPENGLBLIT), která se při inicializaci předá spolu s ostatními flagy funkci SDL_SetVideoMode(). Tím bychom mohli celý článek skoro ukončit, ale zbývá probrat ještě několik věcí...</p>
+
+
+<h2>Soubory pro OpenGL</h2>
+
+<p>SDL nabízí programátorovi hlavičkový soubor SDL_opengl.h, který za něj vyřeší různé umístění OpenGL souborů gl.h a glu.h v některých systémech. Zároveň umožňuje používat rozšíření (extensiony), ale nevkládá je klasicky prostřednictvím glext.h, ale jeho obsah zahrnuje přímo v sobě.</p>
+
+<p>Nemělo by být zapomenuto na přilinkování OpenGL knihoven (libGL.so, libGLU.so v Linuxu popř. opengl32.lib a glu32.lib ve Visual C++ pod MS Windows), jinak program nepůjde s odkazy na neexistující funkce vytvořit.</p>
+
+
+<h2>Atributy OpenGL kontextu</h2>
+
+<p>Před samotným voláním SDL_SetVideoMode() by již měly být specifikovány atributy definující vlastnosti OpenGL kontextu, po vytvoření okna už nepůjdou změnit.</p>
+
+<pre>
+int SDL_GL_SetAttribute(SDL_GLattr attr, int value);
+</pre>
+
+<p>Prvním parametrem se určuje nastavovaný atribut a druhý parametr představuje jeho hodnotu. Za atributy lze použít některou z následujících konstant.</p>
+
+
+<ul>
+<li class="vspace">SDL_GL_RED_SIZE, SDL_GL_GREEN_SIZE, SDL_GL_BLUE_SIZE, SDL_GL_ALPHA_SIZE<br />Velikosti jednotlivých barevných komponent ve framebufferu</li>
+
+<li class="vspace">SDL_GL_BUFFER_SIZE<br />Velikost framebufferu v bitech</li>
+
+<li class="vspace">SDL_GL_DOUBLEBUFFER<br />Nula vypíná OpenGL double buffering, jednička zapíná. Tento parametr nemá nic společného se SDL_DOUBLEBUF předávaného do SDL_SetVideoMode().</li>
+
+<li class="vspace">SDL_GL_DEPTH_SIZE<br />Velikost bufferu hloubky</li>
+
+<li class="vspace">SDL_GL_STENCIL_SIZE<br />Velikost stencil bufferu</li>
+
+<li class="vspace">SDL_GL_ACCUM_RED_SIZE, SDL_GL_ACCUM_GREEN_SIZE, SDL_GL_ACCUM_BLUE_SIZE, SDL_GL_ACCUM_ALPHA_SIZE<br />Velikosti jednotlivých komponent v akumulačním bufferu</li>
+
+<li class="vspace">SDL_GL_STEREO<br />Stereoskopický OpenGL kontext; parametr není dostupný na všech systémech</li>
+
+<li class="vspace">SDL_GL_MULTISAMPLEBUFFERS, SDL_GL_MULTISAMPLESAMPLES<br />Zapíná fullscreenový antialiasing (fsaa) a specifikuje počet vzorků; do SDL přidán ve verzi 1.2.6 a je dostupný pouze, pokud grafická karta podporuje rozšíření GL_ARB_multisample. Tento parametr zlepšuje grafické vzezření aplikace - vyhlazuje ostré hrany barevných přechodů.</li>
+</ul>
+
+<p>Pozn.: Poslednímu parametru, fsaa, se nebudu dále věnovat, protože moje grafická karta zmíněný extension nepodporuje. Projevuje se to tak, že se SDL_SetVideoMode() při jeho definování ukončí s chybou a následný SDL_GetError() vrátí řetězec &quot;Couldn't find matching GLX visual&quot;.</p>
+
+<p>Pravděpodobně bude nutné vytvořit &quot;obyčejné&quot; OpenGL okno a zeptat se gluCheckExtension(), zda je fsaa podporován. Pokud ano, zavřít okno a vytvořit ho znovu, tentokrát s podporou fsaa, pokud ne, pokračovat beze změny dále. Druhou možností je načítat konfiguraci ze souboru a nechat jeho zapnutí na uživateli.</p>
+
+<p>Typický příklad nastavení OpenGL atributů</p>
+
+<pre>
+// Umístit PŘED volání SDL_SetVideoMode()
+SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);	// Doublebuffering ano
+SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, 24);	// 24 bitový framebuffer
+SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);	// 24 bitový depth buffer
+
+SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 0);	// Žádný stencil buffer
+SDL_GL_SetAttribute(SDL_GL_ACCUM_RED_SIZE, 0);	// Žádný akumulační buffer
+SDL_GL_SetAttribute(SDL_GL_ACCUM_GREEN_SIZE, 0);
+SDL_GL_SetAttribute(SDL_GL_ACCUM_BLUE_SIZE, 0);
+SDL_GL_SetAttribute(SDL_GL_ACCUM_ALPHA_SIZE, 0);
+
+// Pouze pokud grafická karta podporuje GL_ARB_multisample
+// SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);// FSAA ano
+// SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);// 2 vzorky
+</pre>
+
+
+<h2>Zjištění atributů</h2>
+
+<p>Někdy může být dobré po vytvoření okna zjistit, zda byl, nebo nebyl atribut nastaven. Slouží k tomu funkce SDL_GL_GetAttribute().</p>
+
+<pre>
+int SDL_GL_GetAttribute(SDLGLattr attr, int *value);
+</pre>
+
+<p>Stejně jako SDL_GL_SetAttribute() i tato funkce vrací při úspěchu 0 a při neúspěchu -1, ale měla by být volána až po SDL_SetVideoMode(). Hodnota zjišťovaného atributu bude uložena na adresu value.</p>
+
+<p>Příklad na zjištění velikosti hloubkového bufferu:</p>
+
+<pre>
+// Umístit ZA volání SDL_SetVideoMode()
+int tmp;
+SDL_GL_GetAttribute(SDL_GL_DEPTH_SIZE, &tmp);
+
+printf("Velikost hloubkového bufferu je %d bitů\n.", tmp);
+</pre>
+
+
+<h2>Prohození vykreslovacích bufferů</h2>
+
+<p>K prohození předního a zadního bufferu po renderingu scény slouží v SDL funkce SDL_GL_SwapBuffers(), bez jejího volání by se nikdy nic nezobrazilo.</p>
+
+<pre>
+void SDL_GL_SwapBuffers(void);
+</pre>
+
+<p>Pokud byla při vytváření okna definována možnost použití i klasické SDL grafiky (SDL_OPENGLBLIT), je nutné volat navíc i SDL_UpdateRects().</p>
+
+
+<h2>Získání adresy OpenGL funkce</h2>
+
+<p>Ukazatel na jakoukoli OpenGL rutinu (většinou se jedná o rozšíření) lze získat pomocí funkce</p>
+
+<pre>
+void *SDL_GL_GetProcAddress(const char* proc);
+</pre>
+
+<p>Parametrem je řetězec se jménem funkce a návratovou hodnotou daný ukazatel. Pokud nebude funkce nalezena je vráceno NULL.</p>
+
+
+<h2>Specifikace OpenGL knihovny</h2>
+
+<p>SDL se v běžném případě linkuje s OpenGL knihovnou, která se nachází v systému, ale pokud programátor chce, může být SDL zkompilováno, aby nahrávalo OpenGL ovladač v runtimu (standardně vypnuto).</p>
+
+<pre>
+int SDL_GL_LoadLibrary(const char *path);
+</pre>
+
+<p>Tato funkce musí být opět volána ještě před SDL_SetVideoMode(), parametr specifikuje diskovou cesta k OpenGL knihovně. Pokud se ji podaří nahrát, je vrácena nula, jinak -1. Následně musí být pomocí SDL_GL_GetProcAddress() získány ukazatele na všechny OpenGL funkce, včetně glEnable(), glBegin() atd., takže použití této techniky může leckomu připadat velmi těžkopádné.</p>
+
+
+<h2>OpenGL textury a SDL_Surface</h2>
+
+<p>Jednou z velkých výhod spojení OpenGL s knihovnou SDL je možnost nahrávat obrázky pro textury za použití knihovny SDL_Image. Bohužel však existují dvě překážky, které znemožňují přímočaré použití.</p>
+
+<p>První z nich je množství nejrůznějších vnitřních formátů SDL_Surface, které samotnému SDL sice nevadí, ale při použití kdekoli jinde se na ně musí pamatovat a vždy hlídat správný formát. Když se pomine paletový režim, pak stále zůstává prakticky libovolné umístění barevných složek (RGB, BGR apod.). Pravděpodobně nejspolehlivějším překonáním tohoto problému je vytvořit nový surface s pro OpenGL použitelným formátem a přes SDL_Blit() do něj zkopírovat původní surface.</p>
+
+<p>Druhý problém spočívá v tom, že textura vytvořená ze SDL_Surface je v OpenGL vzhůru nohama, knihovny totiž používají vzájemně nekompatibilní souřadnicový systém - v SDL je bod 0, 0 nahoře, u OpenGL textur standardně dole.</p>
+
+<p>Řešení je hned několik. Všude v programu lze zadávat v koordinát jako 1-v. Tím se sice problém spolehlivě vyřeší, ale musí se dávat pozor, aby toto pravidlo nebylo porušeno. Textury z více různých zdrojů se stanou vražednou kombinací...</p>
+
+<p>Další možnost spočívá ve změně souřadnicového systému textur, stačí vložit následující kód do inicializace. Nicméně u textur z více zdrojů mohou opět vzniknout problémy a psát tyto čtyři řádky zvlášť při každém použití, nemusí být zrovna pohodlné.</p>
+
+<pre>
+glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
+	glScalef(1.0f, -1.0f, 1.0f);
+glMatrixMode(GL_MODELVIEW);
+</pre>
+
+<p>Posledním a asi nejvhodnějším způsobem je před vlastním vytvořením textury přímo v surface natvrdo prohodit řádky. Tento postup je ukázán ve druhém ukázkovém programu z této lekce.</p>
+
+
+<h2>Poznámka ohledně změny velikosti okna</h2>
+
+<p>Při vytváření OpenGL aplikací pod knihovnou SDL jsem objevil jistou nekompatibilitu mezi systémy Linux a Windows. Když uživatel změní velikost okna, aplikace by měla zareagovat a přizpůsobit se. Ve Windows stačí aktualizovat OpenGL viewport a perspektivu, nicméně v Linuxu musí být zavolána i funkce SDL_SetVideoMode(). Bez ní bude program vypadat jako na následujícím obrázku - okno se sice roztáhne, ale oblast, do které se kreslí, zůstane nezměněna.</p>
+
+<div class="img"><img src="./data/08_resize_lin.png" width="254" height="168" alt="Změna velikosti okna v Linuxu" /></div>
+
+<p>Problémem je, že volání SDL_SetVideoMode() způsobí ve Windows ztrátu OpenGL kontextu, čili resetují se všechna nastavení (barva pozadí, blending, mlha...), zmizí textury, display listy atd.</p>
+
+<div class="img"><img src="./data/08_resize_win.png" width="254" height="168" alt="Změna velikosti okna ve Windows" /></div>
+
+<p>Tento problém řeším podmíněným překladem. Když kompiluji program pro Linux, definuji symbolickou konstantu, která způsobí přidání SDL_SetVideoMode() do kódu, když ve Windows, řádek s #define zakomentuji. Možná to není zrovna nejlepší cesta, ale bez problémů funguje. Pokud někdo znáte lepší řešení, svěřte se prosím do diskuze...</p>
+
+<pre>
+#define CALL_SETVIDEOMODE_WHEN_RESIZING
+
+	// Ošetření události změny velikosti okna
+	case SDL_VIDEORESIZE:
+#ifdef CALL_SETVIDEOMODE_WHEN_RESIZING
+		g_screen = SDL_SetVideoMode(event.resize.w,
+			event.resize.h, WIN_BPP, WIN_FLAGS);
+
+		if(g_screen == NULL)
+		{
+			fprintf(stderr,
+				"Unable to resize window: %s\n",
+				SDL_GetError());
+			return false;
+		}
+#endif
+		ResizeGL(event.resize.w, event.resize.h);
+		break;
+</pre>
+
+<p>Možná by to šlo celé automatizovat pomocí symbolických konstant, které se během překladu definují nezávisle na programátorovi a které většinou obsahují jméno kompilátoru, verzi, operační systém atd., ale proč si komplikovat život.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>RGB Trojúhelník</h3>
+
+<p>Příklad ukazuje nastavení OpenGL atributů a vytvoření okna s podporou OpenGL. Aby nezůstalo jen u černého pozadí, je vykreslován trojúhelník s lineárním mísením barev. <a href="./src/sdl_08_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/08_prog_a.png" width="328" height="269" alt="RGB trojúhelník" /></div>
+
+
+<h3>Rotující logo SDL</h3>
+
+<p>Druhý příklad vykresluje jednoduchou animaci rotujícího loga knihovny SDL. Obrázek pro texturu je uložen na disku ve formátu PNG a do programu je nahráván pomocí knihovny SDL_image. <a href="./src/sdl_08_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/08_prog_b.png" width="328" height="269" alt="Rotující logo SDL" /></div>
+
+
+<h3>Pohyb v mřížce</h3>
+
+<p>Jedná se o jednoduché demo ovládané myší, ve kterém se hráč pohybuje mřížkou. Díky periodickému opakování elementárních buněk v prostoru nelze nikdy dojít na okraj. Kód je založen na jedné malé knihovně, kterou se v poslední době snažím dát dohromady, ale zatím ještě nebyla nezveřejněna. (zdrojový kód se zvýrazněním syntaxe: <a href="./src/sdl_08_c_h.html">hlavičkový soubor třídy aplikace</a>, <a href="./src/sdl_08_c_cpp.html">implementace</a>)</p>
+
+<div class="img"><img src="./data/08_prog_c.png" width="328" height="269" alt="Pohyb v mřížce" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_08_a.tar.gz">Příklad: RGB Trojúhelník</a></li>
+<li><a href="./src/sdl_08_b.tar.gz">Příklad: Rotující logo SDL</a></li>
+<li><a href="./src/sdl_08_c.tar.gz">Příklad: Pohyb v mřížce</a></li>
+<li><a href="sdl_08.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>V následujícím dílu se podíváme na knihovnu SDL_ttf, která umožňuje vypisovat texty.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 21.02.2005</div>
+
+</body>
+</html>

@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (7)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (7)</h1>
+
+<p class="perex">Tentokrát se ponoříme trochu více do hloubky, popíšeme si SDL grafické struktury a tyto znalosti následně využijeme k přímému přístupu k pixelům obrázku. V závěru budeme také měnit kurzor myši.</p>
+
+
+<h2>Struktura SDL_Surface</h2>
+
+<p>Každý už jistě ví, že základem veškeré grafiky, kterou poskytuje knihovna SDL, je struktura SDL_Surface. Poprvé jsme se s ní setkali už u funkce SDL_SetVideoMode(), kde představovala framebuffer okna, a následně u všech kreslících funkcí. Obecně může být jakýmkoli úložištěm pixelů. Pro vlastní programování není znalost jejího vnitřního formátu většinou nijak zásadní, nicméně alespoň všeobecná představa se může hodit.</p>
+
+<pre>
+typedef struct SDL_Surface
+{
+	Uint32 flags;
+	SDL_PixelFormat *format;
+	int w, h;
+	Uint16 pitch;
+	void *pixels;
+
+	SDL_Rect clip_rect;
+	int refcount;
+
+	// + další privátní složky (viz SDL_video.h)
+} SDL_Surface;
+</pre>
+
+<p>Položka flag může u obecného surface nabývat pouze kombinací hodnot SDL_SWSURFACE, SDL_HWSURFACE a SDL_ASYNCBLIT. Flagy fullscreenu, změny velikosti a podobné jsou dostupné pouze u surface okna.</p>
+
+<p>Hardwarový surface a tedy i hardwarovou akceleraci bývá vhodné používat při blittingu, který se tím výrazně urychlí, naopak při častých modifikacích pixelů (oheň v ukázkovém programu k tomuto článku je typickým příkladem) není jeho použití zrovna nejvhodnější, protože by pixely neustále kolovaly ke grafické kartě a zpět. V podobných případech je vhodnější uložit surface do systémové paměti.</p>
+
+<p>Druhá položka struktury představuje formát pixelů (více níže), w a h specifikují rozměry obrázku v pixelech a pitch je délka jednoho řádku v bytech, ten může být zarovnán na určitou velikost. Pointer pixels ukazuje na grafická data obrázku (levý horní roh), jedná se buď o pixely, nebo v případě barevné hloubky osm bitů a menší o indexy do palety.</p>
+
+<p>Clip_rect je ořezávací obdélník, díky kterému je možné obrázek pro některé funkce &quot;imaginárně zmenšit&quot;, setkali jsme se s ním už minule u funkce SDL_SetClipRect(). Konečně refcount je počet referencí, který se používá při uvolňování obrázku z paměti. Kromě těchto parametrů obsahuje SDL_Surface ještě další privátní složky.</p>
+
+<p>Pozn.: Žádný z těchto parametrů, vyjma ruční modifikace pixelů, by neměl být zadáván explicitně. Pro tyto činnosti slouží standardní funkce, které byly probrány v minulých článcích.</p>
+
+
+<h2>Struktura SDL_PixelFormat</h2>
+
+<p>Tato struktura popisuje formát pixelů uložených v surface, její podrobná znalost je nutná jen při požadavku přímého přístupu k pixelům. V ostatních případech by mělo stačit pouze vědět, že existuje a že ji lze najít v surface->format.</p>
+
+<pre>
+typedef struct
+{
+	SDL_Palette *palette;
+	Uint8  BitsPerPixel;
+	Uint8  BytesPerPixel;
+	Uint32 Rmask, Gmask, Bmask, Amask;
+	Uint8  Rloss, Gloss, Bloss, Aloss;
+	Uint8  Rshift, Gshift, Bshift, Ashift;
+	Uint32 colorkey;
+	Uint8  alpha;
+} SDL_PixelFormat;
+</pre>
+
+<p>Palette buď ukazuje na paletu, nebo je, u barevné hloubky větší než 8 bitů, nastaveno na NULL. Barevná hloubka je specifikována hned ve dvou položkách. V první z nich je uložena v bitech a u druhé jsou jednotkami byty.</p>
+
+<p>Bity RGBA masky jsou na pozici dané složky v jedničce, RGBA loss určuje ztrátu přesnosti barevné složky - 2<sup>[RGBA]loss</sup>. RGBA shift označuje počet bitů zprava v hodnotě pixelu k dané komponentě. Colorkey určuje transparentní barvu a alpha &quot;globální hodnotu alfa kanálu&quot; surface.</p>
+
+
+<h2>Struktury SDL_Palette a SDL_Color</h2>
+
+<p>Struktura SDL_Palette obsahuje ukazatele na barvy palety a SDL_Color je tvořena jednotlivými RGB složkami barvy.</p>
+
+<pre>
+typedef struct
+{
+	int ncolors;
+	SDL_Color *colors;
+} SDL_Palette;
+
+typedef struct
+{
+	Uint8 r;
+	Uint8 g;
+	Uint8 b;
+	Uint8 unused;
+} SDL_Color;
+</pre>
+
+
+<h2>Adresace pixelů a získání barevných komponent</h2>
+
+<p>Pixely jsou v surface uloženy do jednorozměrného pole, a tudíž může vyvstat otázka, jak je adresovat při použití dvourozměrných x, y koordinátů. Požadovaná adresa pixelu se získá vynásobením šířky řádku y-ovou pozicí a přičtením x-ové pozice k výsledku. Je nutné vzít v úvahu ještě barevnou hloubku, ale jinak se nejedná o nic složitého.</p>
+
+<p>Příklad bude možná názornější. Na obrázku níže je vidět mřížka, ve které každý čtvereček symbolizuje jeden pixel. Šedý okraj vpravo představuje nevyužitou část paměti (parametr pitch). Adresa zvýrazněných pixelů (indexů do palety) se bude rovnat (měřeno v bytech):</p>
+
+<pre>
+Uint8 *adr;
+int bypp = s->format->BytesPerPixel;
+
+// ADRESA = POČÁTEK + ŘÁDEK*ŠÍŘKA ŘÁDKU
+//		+ SLOUPEC*ŠÍŘKA PIXELU;
+
+// Zelený
+adr = (Uint8 *)s->pixels + 2*s->pitch + 3*bypp;
+// Červený
+adr = (Uint8 *)s->pixels + 3*s->pitch + 1*bypp;
+</pre>
+
+<div class="img"><img src="./data/07_adresace.png" width="122" height="102" alt="Adresace pixelů" /></div>
+
+
+<p>Je-li pixel načtený, je většinou potřeba získat hodnoty jednotlivých RGB(A) složek. Žádné pevně dané pořadí (RGB, BGR apod.) není v SDL obecným pravidlem. Jak tedy na to? Pixel se binárně ANDuje s maskou barvy, čímž se vynulují hodnoty všech ostatních komponent, poté se aplikují dva binární posuny, nejprve o shift doprava a následně o loss doleva.</p>
+
+<p>Po průchodu následujícím kódem bude proměnná red obsahovat červenou složku barvy v pixelu. Získání modré, zelené nebo alfy je analogické.</p>
+
+<pre>
+Uint8 red;
+Uint32 tmp, pixel;
+// fmt je ukazatel na formát pixelů
+
+tmp = pixel &amp; fmt-&gt;Rmask;	// Maskování
+tmp = tmp &gt;&gt; fmt-&gt;Rshift;	// Posun na pravý okraj
+tmp = tmp &lt;&lt; fmt-&gt;Rloss;	// Expanze na 8 bitů
+red = (Uint8)tmp;		// &quot;Ořeže&quot; nuly vlevo
+</pre>
+
+<p>Druhou možností by bylo použít standardní funkci SDL_GetRGB(), která byla popsána v minulém dílu.</p>
+
+<p>Mimochodem, vždy je možné si zavést konvenci, že všechny surface v programu budou například ve formátu RGB(A) a tím tyto komplikace obejít. Na druhou stranu, program bude méně univerzální a při skládání dvou kódů vyvíjených nezávisle na sobě mohou vzniknout zbytečné komplikace.</p>
+
+
+<h2>Zamknutí surface</h2>
+
+<p>V případě, že chce programátor přistupovat přes ukazatel surface->pixels přímo k jednotlivým pixelům, měl by nejdříve surface uzamknout. Jedinou výjimkou jsou takové surface, u kterých makro SDL_MUSTLOCK() vrátí nulu, pak je přístup k pixelům možný kdykoli.</p>
+
+<p>Za &quot;práci s pixely&quot; se považuje ruční přístup k datům přes ukazatel ve struktuře. Naopak u kreslících funkcí, které jsou poskytovány SDL (SDL_BlitSurface() apod.), by surface nikdy být zamknut neměl!</p>
+
+<pre>
+int SDL_LockSurface(SDL_Surface *surface);
+void SDL_UnlockSurface(SDL_Surface *surface);
+</pre>
+
+<p>Po ukončení úprav pixelů by mělo vždy následovat odemknutí a jelikož jsou zámky vícenásobné, mělo by ke každému zamknutí existovat odpovídající odemknutí. To znamená, že pokud je surface zamknut dvakrát, měl by být také dvakrát odemknut.</p>
+
+<p>Mezi těmito funkcemi by se také nemělo vyskytnout žádné systémové nebo knihovní volání. V obecném případě by zamykání a odemykání mohlo vypadat např. takto:</p>
+
+<pre>
+if(SDL_MUSTLOCK(screen))
+{
+	if(SDL_LockSurface(screen) &lt; 0)
+	{
+		return;
+	}
+}
+
+// Práce s pixely
+
+if(SDL_MUSTLOCK(screen))
+{
+	SDL_UnlockSurface(screen);
+}
+</pre>
+
+
+<h2>Kurzor myši</h2>
+
+<p>Na závěr výkladu o SDL grafice bude probráno téma změny kurzoru myši. K jeho vytvoření slouží funkce SDL_CreateCursor(), která vrací ukazatel na nově vytvořenou strukturu SDL_Cursor.</p>
+
+<pre>
+SDL_Cursor *SDL_CreateCursor(Uint8 *data, Uint8 *mask,
+		int w, int h, int hot_x, int hot_y);
+</pre>
+
+<p>První dva parametry jsou bitovými mapami a určují, jak bude výsledný kurzor vypadat (viz dále). Další dva označují šířku a výšku, obě hodnoty musí být násobkem čísla osm a poslední dva parametry specifikují aktivní bod kurzoru.</p>
+
+<p>Kurzor vytvořený pomocí SDL může být pouze černobílý, takže by mělo stačit pouze jedno bitové pole. Nesmí se však zapomenout ještě na průhlednou a případně invertovanou barvu, což dává celkem čtyři možné kombinace, jejichž význam vysvětluje následující tabulka.</p>
+
+<table>
+<tr align="left">
+<th>Data</th>		<th>Maska</th>	<th>Výsledný pixel kurzoru</th>
+</tr>
+
+<tr><td>0</td>		<td>1</td>	<td>Bílý</td></tr>
+<tr><td>1</td>		<td>1</td>	<td>Černý</td></tr>
+<tr><td>0</td>		<td>0</td>	<td>Průhledný</td></tr>
+<tr><td>1</td>		<td>0</td>	<td>Je-li dostupný, tak invertovaný, jinak černý</td></tr>
+</table>
+
+<p>Po skončení práce s kurzorem by měla být vždy zavolána funkce SDL_FreeCursor(), která se postará o jeho uvolnění z paměti.</p>
+
+<pre>
+void SDL_FreeCursor(SDL_Cursor *cursor);
+</pre>
+
+
+<p>Kurzor lze nastavit za aktivní voláním funkce SDL_SetCursor(). Naopak aktuálně aktivní kurzor lze získat funkcí SDL_GetCursor().</p>
+
+<pre>
+void SDL_SetCursor(SDL_Cursor *cursor);
+SDL_Cursor *SDL_GetCursor(void);
+</pre>
+
+<p>Poslední operací, která se dá provést s kurzorem myši, je jeho zobrazení popř. skrytí. Po startu aplikace je implicitně zobrazen.</p>
+
+<pre>
+int SDL_ShowCursor(int toggle);
+</pre>
+
+<p>Symbolická konstanta SDL_DISABLE kurzor skryje, naopak SDL_ENABLE ho zobrazí. Pomocí SDL_QUERY bude vrácen aktuální stav.</p>
+
+
+<p>V následujícím příkladu se vytvoří kurzor ve tvaru bílého čtverce o velikosti 8x8 pixelů, za aktivní bod je definován levý horní roh.</p>
+
+<pre>
+// Globální proměnná
+SDL_Cursor *g_cursor;
+
+// Inicializace
+Uint8 data[] = { 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00 };
+Uint8 mask[] = { 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF };
+
+g_cursor = SDL_CreateCursor(data, mask, 8, 8, 0, 0);
+SDL_SetCursor(g_cursor);
+
+// Deinicializace (většinou konec aplikace)
+SDL_FreeCursor(g_cursor);
+</pre>
+
+<p>Pozn.: SDL sice umožňuje vytvářet pouze černobílé kurzory, ale to neznamená, že nelze používat i barevné. Vždy je možné pomocí SDL_ShowCursor(SDL_DISABLE) standardní kurzor skrýt a místo něho při každém vykreslení zobrazit libovolný obrázek nebo dokonce spritovou animaci (animovaný kurzor).</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Přímý přístup k pixelům surface</h3>
+
+<p>Při ruční modifikaci pixelů bývá největším problémem adresovat místo v paměti, na které se má zapisovat. O tuto činnost se stará funkce DrawPixel(), která byla převzata ze SDL intro a trochu upravena. Demonstrační program touto technikou vykreslí tři čtverce a linku palety šedi. <a href="./src/sdl_07_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/07_prog_a.png" width="328" height="269" alt="Přímý přístup k pixelům surface" /></div>
+
+
+<h3>Oheň</h3>
+
+<p>Druhý příklad simuluje hořící oheň. Na nejnižším řádku se generují náhodné pixely z palety barev ohně, které se s rostoucí výškou postupně rozmazávají. V programu je dále definován kurzor myši ve tvaru &quot;zaměřovače&quot; (černé kolečko s bílým středem; na screenshotu není vidět), kterým je možné do ohně přidávat bílé pixely. <a href="./src/sdl_07_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/07_prog_b.png" width="328" height="148" alt="Oheň" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_07_a.tar.gz">Příklad: Přímý přístup k pixelům surface</a></li>
+<li><a href="./src/sdl_07_b.tar.gz">Příklad: Oheň</a></li>
+<li><a href="sdl_07.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Tímto článkem jsme SDL grafiku ukončili, příště se budeme věnovat OpenGL.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 07.03.2005</div>
+
+</body>
+</html>

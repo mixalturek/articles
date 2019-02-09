@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (22)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (22)</h1>
+
+<p class="perex">V dnešním díle o knihovně SDL se budeme věnovat podpoře tzv. vícevláknového programování. Podíváme se na vytváření nových vláken a samozřejmě také jejich synchronizaci, která nikdy nesmí chybět.</p>
+
+
+<h2>Jednovláknové a vícevláknové programy</h2>
+
+<p>Mít v programu více vláken může být velice výhodné. Jedno se stará o události, druhé o vykreslování a animace, třetí s pátým o cokoli jiného a všechno se to vykonává současně. Na stranu druhou si lze multithreadingem zadělat na tak obrovskou hromadu problémů, jaké si programátor &quot;klasických&quot; aplikací nedokáže ani představit.</p>
+
+<p>Typickým příkladem jednovláknového programu je Hello, World. Na začátku se spustí main(), v ní se něco vypíše a pak se ukončí. V libovolném okamžiku běhu programu je možné zjistit, jaká instrukce právě proběhla a jaká bude následovat.</p>
+
+
+<h2>Spouštění vláken</h2>
+
+<p>Vícevláknový program také začíná funkcí main(), ale v určitém okamžiku se rozhodne, že by bylo vhodné spustit další vlákno. V případě SDL je tím okamžikem volání SDL_CreateThread(), které se předává ukazatel na libovolnou funkci, jejíž kód se bude v nově vytvořeném vláknu provádět. Vlákno se ukončí spolu s návratem z této funkce.</p>
+
+<pre>
+SDL_Thread *SDL_CreateThread(int (*fn)(void *), void *data);
+</pre>
+
+<p>Parametr typu void* je zde zvolen naprosto záměrně. Díky němu lze předat přes ukazatel data do funkce v podstatě cokoliv. Aby šlo pracovat s vlákny, je nutné inkludovat hlavičkový soubor SDL_thread.h, v němž se deklaruje vše potřebné.</p>
+
+<p>Po průchodu funkcí SDL_CreateThread() se bude staré i nové vlákno vykonávat téměř současně. Slovo 'téměř' v tomto případě znamená, že na počítači s více procesory půjde (teoreticky) o paralelní běh. V případě jednoprocesorového systému se vlákna dynamicky přepínají, perioda je v jednotkách až desítkách milisekund, takže pro uživatele v podstatě neexistuje.</p>
+
+<p>Pozn.: Teorie vícevláknového programování většinou pracuje také s tzv. procesy. Rozdíl mezi procesem a vláknem je ten, že jednotlivá vlákna sdílejí všechny systémové prostředky (paměť apod.), kdežto procesy jsou kompletně oddělené. Každý program uložený na disku se po svém spuštění stává procesem, může spouštěn další procesy a v nich vlákna. SDL vytváření procesů neumožňuje.</p>
+
+<p>Hlavní vlákno by nikdy nemělo skončit dříve než všechna jím vytvořená vlákna. SDL pro tento účel poskytuje dvě funkce SDL_WaitThread() a SDL_KillThread(). První z nich čeká neomezenou dobu na ukončení a zároveň přebírá návratovou hodnotu, druhá funkce vlákno natvrdo zastaví.</p>
+
+<p>Je-li to alespoň trochu možné, mělo by se vždy počkat na návrat z funkce spuštěné ve vláknu. Pokud například alokovalo dynamickou paměť, nemělo by ji šanci uvolnit.</p>
+
+<pre>
+void SDL_WaitThread(SDL_Thread *thread, int *status);
+void SDL_KillThread(SDL_Thread *thread);
+</pre>
+
+<p>ID vlákna lze získat pomocí SDL_ThreadID() a SDL_GetThreadID(). První z funkcí uvažuje aktuální spuštěné vlákno a druhá libovolné předané.</p>
+
+<pre>
+Uint32 SDL_ThreadID(void);
+Uint32 SDL_GetThreadID(SDL_Thread *thread);
+</pre>
+
+<p>V následujícím výpisu vytvoří funkce main() pracovní vlákno reprezentované funkcí vlakno(), obě se pak budou vykonávat paralelně. S našimi dosavadními znalostmi je vše naprogramováno správně, ale jak si ukážeme za chvíli, do kódu bude nutné ještě něco dopsat.</p>
+
+<pre>
+#include &lt;stdio.h&gt;
+#include &lt;SDL.h&gt;
+#include &lt;SDL_thread.h&gt;
+
+int vlakno(void *arg)
+{
+	// Nějaký kód
+	for(int i = 0; i &lt; 10000; i++)
+		printf("vlakno()\n");
+
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	// Inicializace SDL
+
+	SDL_Thread *thread;
+	if((thread = SDL_CreateThread(vlakno, NULL)) == NULL)
+	{
+		fprintf(stderr, "Nelze vytvořit vlákno: %s",
+				SDL_GetError());
+		return 1;
+	}
+
+	// Nějaký kód
+	for(int i = 0; i &lt; 10000; i++)
+		printf("main()\n");
+
+	// Počká se na ukončení vlákna
+	SDL_WaitThread(thread, NULL);
+	return 0;
+}
+</pre>
+
+<p>Výstup z programu jsem maličko upravil, ve skutečnosti stihne vlákno, před přepnutím do dalšího, zobrazit údajů mnohem více.</p>
+
+<pre>
+vlakno()
+main()
+main()
+main()
+vlakno()
+vlakno()
+main()
+vlakno()
+</pre>
+
+
+<h2>Synchronizace vláken</h2>
+
+<p>Do této chvíle bylo vše docela jednoduché, hlavním problémem u vláken je především jejich synchronizace a související integrita sdílených dat. Vrátíme-li se k předchozí ukázce, výstup programu bude ve skutečnosti vypadat spíše následovně.</p>
+
+<pre>
+main()
+mvlakno()
+vlakno()
+vlakain()
+mainno()
+vlakno()
+</pre>
+
+<p>Nikde není řečeno, že se vlákna nemohou přepnout během vykonávání funkce printf(), takže se oba výpisy (ne)očekávaně slijí dohromady. Ve výsledku je text naprosto nečitelný. Vytvoření dalších vláken není nic složitého, těžká je spíše jejich synchronizace, aby nedocházelo k podobným stavům, jako v příkladu.</p>
+
+<p>Jenom tak na okraj: nečekejte, že po přečtení tohoto článku se stanete expertem na paralelní systémy, k rozebrání tohoto tématu na alespoň trochu obstojné úrovni by možná nestačila ani několikasetstránková publikace. Jestli Vás mohu poprosit, berte tento článek spíše jako &quot;populárně vědecké&quot; seznámení...</p>
+
+<p>V podstatě všechny nástroje pro synchronizaci jsou, velice zjednodušeně řečeno, jakési flagy řídící přístup do úseků programu, ve kterých může dojít k vzájemnému ovlivnění vláken. Už jsme se setkali se slitím výpisů v ukázkovém programu, typicky se jedná o přístup ke sdíleným (globálním) proměnným. Pamatujete-li si ještě na dvojici funkcí lock/unlock z grafiky popř. zvuků, musely se volat právě kvůli multithreadingu.</p>
+
+<p>Pozn.: Výraz 'kritická sekce' není v textu používán záměrně. Ve Win32 API se jedná přímo o synchronizační prostředek, mohlo by se to plést.</p>
+
+
+<h3>Mutexy</h3>
+
+<p>Jeden z prostředků pro synchronizaci vláken představují tzv. mutexy, které jsou v SDL dostupné prostřednictvím struktury SDL_mutex. Ukazatel na nově vytvořený, odemknutý mutex je možné získat funkcí SDL_CreateMutex(), po skončení práce by se měl vždy pomocí SDL_DestroyMutex() uvolnit.</p>
+
+<pre>
+SDL_mutex *SDL_CreateMutex(void);
+void SDL_DestroyMutex(SDL_mutex *mutex);
+</pre>
+
+<p>Pro zamknutí mutexu slouží funkce SDL_mutexP(), respektive její alias SDL_LockMutex(). Je-li už mutex zamknut jiným vláknem, vykonávání této funkce probíhá do té doby, než je mutex odemknut. Zamykání je navíc násobné, takže počet zamknutí musí odpovídat počtu odemknutí. V případě úspěchu vrátí funkce 0 a neúspěchu -1 (platí obecně u všech funkcí, dále už to nebude zmiňováno).</p>
+
+<pre>
+// Zamknutí
+#define SDL_LockMutex(m) SDL_mutexP(m)
+int SDL_mutexP(SDL_mutex *mutex);
+
+// Odemknutí
+#define SDL_UnlockMutex(m) SDL_mutexV(m)
+int SDL_mutexV(SDL_mutex *mutex);
+</pre>
+
+<p>Uvedeme si jeden velice důležitý poznatek, který nemusí být na první pohled vidět. Pokud používáte dva různé mutexy (platí i pro ostatní synchronizační prostředky), měli byste si dávat pozor na pořadí jejich zamykání. Symbolicky naznačené pořadí</p>
+
+<pre>
+// VLÁKNO 1
+lock(A);
+lock(B);
+// Přístup ke sdíleným prostředkům
+unlock(B);
+unlock(A);
+
+// VLÁKNO 2
+lock(B);
+lock(A);
+// Přístup ke sdíleným prostředkům
+unlock(A);
+unlock(B);
+</pre>
+
+<p>může způsobit tzv. deadlock projevující se kompletním zamrznutím programu. Po nakreslení příkazů jednotlivých vláken vedle sebe, by mělo být vše jasné.</p>
+
+<pre>
+VLÁKNO 1		VLÁKNO 2
+
+...			...
+lock(A);		...
+...			...
+...			lock(B);
+lock(B);		...
+...			lock(A);
+...			...
+wait(B);		wait(A);
+wait(B);		wait(A);
+</pre>
+
+<p>Pozn.: Mutexy si lze zjednodušeně představit jako bool hodnotu s určitým, pevně stanoveným rozhraním. Obyčejné proměnné však pro synchronizaci vláken nelze používat, protože kompilátor nemusí přeložit ani obyčejné přiřazení jedinou (atomickou) instrukcí procesoru. Naproti tomu, rozhraní synchronizačních prostředků zaručuje, že během testu a následného zamknutí nemůže dojít k přepnutí vláken.</p>
+
+<p>Následuje příklad na aplikaci mutexů včetně jejich vytváření a rušení.</p>
+
+<pre>
+// Globální proměnné
+SDL_mutex *g_mutex;
+int g_promenna;
+
+// Vytvoření mutexu (inicializace)
+g_mutex = SDL_CreateMutex();
+
+// Zamknutí mutexu
+if(SDL_mutexP(g_mutex) == -1)
+{
+	fprintf(stderr, "Nelze zamknout mutex\n");
+	// Vhodná reakce
+}
+
+// Přístup ke sdíleným prostředkům
+g_promenna = 173;
+
+// Odemknutí mutexu
+if(SDL_mutexV(g_mutex) == -1)
+{
+	fprintf(stderr, "Nelze zamknout mutex\n");
+	// Vhodná reakce
+}
+
+// Zrušení mutexu (deinicializace)
+SDL_DestroyMutex(g_mutex);
+</pre>
+
+<p>Z příkladu je vidět, že i obyčejné přiřazení do proměnné, ke které přistupují dvě odlišná vlákna, musí být ohlídáno mutexem. Nechtějte se dostat do situace, kdy musíte odladit vícevláknový program, který z neznámého důvodu a pokaždé na jiném místě záhadně padá. Největším problémem je, že běh vícevláknové aplikace nelze nikdy identicky zopakovat, pozdější ladění probíhá na defakto úplně jiném programu.</p>
+
+
+<h3>Semafory</h3>
+
+<p>Další synchronizační proměnnou je semafor, v SDL je reprezentován strukturou SDL_sem. Semafory v sobě zahrnují číslo, které se při zamknutí atomicky dekrementuje a při odemknutí atomicky inkrementuje. Pokud je hodnota semaforu záporná, bude vlákno při zamykání automaticky zablokováno.</p>
+
+<p>Semafor se vytváří funkcí SDL_CreateSemaphore() a ruší SDL_DestroySemaphore(). Jedním ze způsobů využití počáteční hodnoty je specifikace maximálního počtu vláken, které mohou vykonávat určitou činnost - aby například nedošlo k přetížení systému.</p>
+
+<pre>
+SDL_sem *SDL_CreateSemaphore(Uint32 initial_value);
+void SDL_DestroySemaphore(SDL_sem *sem);
+</pre>
+
+<p>Funkce SDL_SemWait() pozastaví vlákno do té doby, než se hodnota semaforu dostane do kladných hodnot. Po průchodu funkcí je následně dekrementována. U druhé uvedené funkce, SDL_SemTryWait(), je činnost stejná, ale vlákno nebude nikdy zablokováno. Nečeká se na vpuštění, ale místo toho je ihned vrácena konstanta SDL_MUTEX_TIMEDOUT, podle které se programátor rozhoduje, co udělat dál.</p>
+
+<p>Třetí varianta reprezentovaná SDL_SemWaitTimeout() je opět téměř stejná, jako předešlé. Na rozdíl od nich čeká na vpuštění pouze stanovený počet milisekund a poté opět vrací konstantu SDL_MUTEX_TIMEDOUT. Dokumentace uvádí, že je na některých platformách implementována cyklem, který každou milisekundu testuje hodnotu semaforu, což není zrovna efektivní.</p>
+
+<pre>
+int SDL_SemWait(SDL_sem *sem);
+int SDL_SemTryWait(SDL_sem *sem);
+int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout);
+</pre>
+
+<p>Po opuštění oblasti, ve které se přistupuje ke sdíleným prostředkům, by se měla zavolat funkce SDL_SemPost(). Dojde ke zvýšení hodnoty semaforu a případnému odblokování některého z čekajících vláken. Podobně, jako u mutexů, by se měla vždy volat ve dvojici s úspěšně provedenými wait funkcemi.</p>
+
+<pre>
+int SDL_SemPost(SDL_sem *sem);
+</pre>
+
+<p>Hodnotu semaforu lze kdykoli získat funkcí SDL_SemValue(). Nikdy by se však neměla používat pro rozhodnutí o přístupu ke sdíleným prostředkům, protože se nejedná o atomickou operaci.</p>
+
+<pre>
+Uint32 SDL_SemValue(SDL_sem *sem);
+</pre>
+
+<p>Jako příklad je uveden pokus o zamknutí pomocí SDL_SemTryWait(). Je-li semafor zamknut jiným vláknem, funkce se sice ukončí ihned, ale kód vlákno ke sdíleným prostředkům nepustí.</p>
+
+<pre>
+// Pokus o zamknutí
+int res = SDL_SemTryWait(my_sem);
+
+// Chyba
+if(res == -1)
+	return CHYBA_PRI_ZAMYKANI;
+
+// Už zamknut jiným vláknem
+if(res == SDL_MUTEX_TIMEDOUT)
+	return SEMAFOR_ZAMKNUT;
+
+/*
+ * Operace se sdílenými prostředky
+ */
+
+// Odblokování
+SDL_SemPost(my_sem);
+</pre>
+
+
+<h3>Podmíněné proměnné</h3>
+
+<p>Podmíněné proměnné (anglicky condition variables) jsou reprezentovány strukturou SDL_cond a vytvářejí se funkcí SDL_CreateCond(). Pro jejich zrušení slouží SDL_DestroyCond(). Díky nim lze implementovat o něco komplexnější podmínky řídící vykonávání vláken.</p>
+
+<pre>
+SDL_cond *SDL_CreateCond(void);
+void SDL_DestroyCond(SDL_cond *cond);
+</pre>
+
+<p>Zamykání je v tomto případě o něco složitější než u jiných synchronizačních prostředků. Funkce SDL_CondWait() přebírá v prvním parametru podmíněnou proměnnou a ve druhém libovolný mutex. Ten by měl být před vstupem do funkce zamknutý. Protože je po průchodu funkcí automaticky odemknut, je na programátorovi, aby ho opětovně uzamknul. Čekání druhé uvedené funkce je časově omezené, po vypršení intervalu vrací konstantu SDL_MUTEX_TIMEDOUT.</p>
+
+<pre>
+int SDL_CondWait(SDL_cond *cond, SDL_mutex *mut);
+int SDL_CondWaitTimeout(SDL_cond *cond, SDL_mutex *mutex, Uint32 ms);
+</pre>
+
+<p>Voláním funkce SDL_CondSignal() se restartuje jedno z vláken, která čekají na na odemknutí podmíněné proměnné a v případě SDL_CondBroadcast() jsou restartovány všechna.</p>
+
+<pre>
+int SDL_CondSignal(SDL_cond *cond);
+int SDL_CondBroadcast(SDL_cond *cond);
+</pre>
+
+
+<h2>Literatura</h2>
+
+<p>Jak už jsem zmínil v průběhu textu, je tento článek spíše úvodem do problematiky vícevláknového programování. Pokud vás zaujala, v knihách uvedených níže, můžete najít mnohem podrobnější informace.</p>
+
+<p>Mark Mitchell, Jeffrey Oldham, Alex Samuel: Pokročilé programování v operačním systému Linux (procesům a vláknům se věnují kapitoly 3, 4 a 5). Anglickou verzi této knihy lze také stáhnout z webu <a href="http://www.advancedlinuxprogramming.com/">http://www.advancedlinuxprogramming.com/</a>, je šířena pod licencí Open Publication License.</p>
+
+<p>Jeffrey Richter: Windows pro pokročilé a experty. Jedná se o trochu starší knihu, která se sice věnuje ještě Win 95/NT, ale rozhodně stojí za to. Mimochodem, už ji asi nekoupíte, zkusil bych spíše nějakou knihovnu.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<p>Moc se omlouvám, ale v tomto dílu žádný ukázkový program nebude. Je to hlavně proto, že s multithreadingem nemám moc praktických zkušeností a netroufám si napsat žádný větší program, který by stál za to.</p>
+
+<p>Druhým důvodem a v tuto chvíli o něco podstatnějším je, že momentálně nemám na disku žádný operační systém a článek dopisuji z live CD Slaxu, kde není ani gcc natož SDL. Původně jsem si myslel, že mi 'strýček' Debian spadl, ale po neúspěšných pokusech s novou instalací (Debian Stable, Ubuntu, Gentoo) odhalil memtest problémy s RAM. Ach jo... :-(</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="sdl_22.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Seriál se pomalu chýlí ke konci. Příště se ještě podíváme na práci se SDL_RWops, což je technika, kterou SDL poskytuje pro abstrakci nad vstupními daty a zbude-li místo, zkusím sepsat všechno, na co jsem během psaní seriálu zapomněl.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 17.07.2005</div>
+
+</body>
+</html>

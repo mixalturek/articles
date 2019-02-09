@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>Pracovat se dá i v textové konzoli</title>
+</head>
+
+<body>
+
+<h1>Prý se dá pracovat i v textové konzoli...</h1>
+
+<p class="perex">Nápad na tento článek se objevil v době, kdy jsem se pokoušel na svůj počítač nainstalovat Gentoo Linux a byl nucen pracovat několik dní výhradně v textové konzoli. Nečekejte ode mě žádné advanced techniky spojování programů a podobné unixové vychytávky, ale spíše reklamu na uživatelsky příjemný software pro textový režim, jako je mc, links, centericq, mutt a další. Článek je určen pro začátečníky, prosím všechny hardcore guru, aby měli shovívavost... ;-]</p>
+
+
+<p>První dotaz, který si jistě každý položí, zní, proč se učit pracovat právě v textovém režimu, když existuje tolik snadno ovladatelných a ve většině případů i rychlých grafických prostředí? Asi nejvhodnější odpověď vidím, kromě krizových stavů operačního systému ;-), v ssh a vzdáleném přístupu. Spustíte ssh klienta, zadáte heslo a jako byste seděli doma u svého počítače místo ve škole nebo v práci.</p>
+
+<pre>
+$ ssh uživatel@počítač.cz
+</pre>
+
+<p>Přes ssh lze samozřejmě spouštět i grafické aplikace, nicméně pravidlem to být nemusí. Na serveru může být například vypnutý X11Forwarding (/etc/ssh/sshd_config X11Forwarding no) nebo při přihlašování přes Putty z MS Windows, popř. jiného neunixového operačního systému. V obou těchto případech si musí uživatel vystačit výhradně s textovým režimem, protože grafický fungovat prostě nebude.</p>
+
+<p>Nemusím, doufám, připomínat, že v Linuxovém textovém režimu není dostupná jen jedna textová konzole. Přepínají se pomocí klávesových zkratek Ctrl+Alt+F1, Ctrl+Alt+F2 atd. (někdy pouze Alt+F*). Pokud často spouštíte tolik aplikací, že už vám počet funkčních kláves nestačí, můžete se zkusit poohlédnout po programu screen. Popis jeho ovládání by vydal na <a href="http://gentoo-wiki.com/TIP_Using_screen">samostatný článek</a>, takže tato zmínka bude vše, co se o něm ode mě dozvíte.</p>
+
+<p>V následujícím textu se pokusím představit uživatelsky příjemný software pro textový režim, který bude zahrnovat většinu oblastí běžné práce na počítači. Jelikož je práce s aplikacemi víceméně intuitivní, nebudu se soustředit ani tak na vlastní ovládání, jako spíše na nejrůznější finty, které na první pohled nejsou moc vidět.</p>
+
+
+<h2>Vylepšení konzole</h2>
+
+<p>Pod slovem textový režim si pamětníci operačního systému MS-DOS asi představí bílý text na černém pozadí o rozlišení obrazovky 80x24 znaků. V Linuxu to pravidlem být nemusí, důležité slovo je framebuffer, v podstatě se jedná o křížence mezi textovým a grafickým režimem. Na úrovni implementace se sice už jedná o grafiku například v rozlišení 1024x768 pixelů, ale primárně je používán, pokud si zrovna neprohlížíte obrázky nebo nepřehráváte filmy, stále pro zobrazování textové konzole.</p>
+
+<p>Máte-li v kernelu zapnutou podporu, ale rozlišení zůstává stále na 80x24 znacích, zkuste v /boot/grub/menu.lst přidat u specifikace kernelu vga parametr. Tabulku jeho hodnot a odpovídající rozlišení s barevnou hloubkou lze najít například na <a href="http://gentoo-wiki.com/HOWTO_Framebuffer:Bootsplash:Grubsplash">gentoo-wiki stránkách</a>.</p>
+
+<pre>
+# /boot/grub/menu.lst
+title		Debian GNU/Linux, kernel 2.6.8-2-k7 (1280x1024, 16M)
+root		(hd0,0)
+kernel		/vmlinuz-2.6.8-2-k7 root=/dev/hda5 ro vga=0x31B
+initrd		/initrd.img-2.6.8-2-k7
+savedefault
+boot
+</pre>
+
+<p>Mimochodem, pokud by vám navíc v konzoli chyběla myš a hlavně schránka přes prostřední tlačítko, není nic snazšího než nainstalovat a spustit <a href="http://freshmeat.net/projects/gpm/">gpm</a> démona.</p>
+
+
+<h2>Správce souborů</h2>
+
+<p>Midnight Commander alias mcéčko zná jistě každý Linuxový uživatel. Tento souborový manažer vychází z dosovského Norton Commanderu, takže pokud jste už někdy měli v ruce dvoupanelový správce souborů, jistě vám ovládání nebude činit žádný problém.</p>
+
+<div class="img"><img src="./data/mc.png" width="486" height="342" alt="" /><br />Midnight Commander</div>
+
+<p>Mc umí přistupovat ke komprimovaným archivům, poskytuje výkonného FTP klienta a také jednoduchý textový editor, jenž je realizován externím programem mcedit.</p>
+
+<p>Za vychytávky bych rád zmínil dvě klávesové zkratky, které ne každý zná. První z nich Ctrl+S urychluje přístup k souborům nacházejícím se v daném adresáři a druhá Ctrl+\ (vedle backspace, nutná anglická klávesnice) dává k dispozici systém záložek.</p>
+
+
+<h2>Komprimace souborů</h2>
+
+<p>Nevím, jestli existuje i něco interaktivního, pro komprimaci používám tar a pro dekompresi mcéčko. Jedná se pravděpodobně o nejrychlejší způsob.</p>
+
+<pre>
+$ tar -czf vytvareny_archiv.tar.gz adresar_pro_komprimaci
+</pre>
+
+
+<h2>Vyhledávání souborů</h2>
+
+<p>Těm, kteří si nejsou schopni zapamatovat množství parametrů programu find a nebaví je pokaždé pročítat manuálové stránky, určitě vydatně poslouží program locate. Narozdíl od find nevyhledává soubory, především kvůli rychlosti, na disku, ale v předem sestavené databázi. K její aktualizaci slouží příkaz updatedb.</p>
+
+<pre>
+$ locate soubor
+$ locate soubor | less
+</pre>
+
+<p>Pokud bude nalezených souborů příliš mnoho a 'utečou' z obrazovky, je možné použít klávesové zkratky Shift+PageUP, Shift+PageDown pro rolování výpisů na konzoli. Druhé řešení spočívá v přesměrování výstupu do less.</p>
+
+
+<h2>Textové editory</h2>
+
+<p>Nejen Emacsem či Vi živ je člověk, nicméně jejich základní znalost, alespoň na úrovni editace konfiguračních souborů, se přeci jen může někdy hodit. Při problémech se systémem mohou být jedněmi z mála funkčních programů.</p>
+
+<p>Mimochodem, pokud vám nestačí jen jeden operační systém ;-) a rozhodnete se pro Emacs, můžete ho mimo jiné používat také pro komunikaci s psychiatrem (Alt+X doctor)</span>.</p>
+
+<div class="img"><img src="./data/vim.png" width="486" height="342" alt="" /><br />Vim</div>
+
+<p>Nezkušení uživatelé dají přednost spíše nějakému jinému editoru. Může se jednat třeba o již zmíněný mcedit, ale také o joe, nano nebo úplně jiný, pravděpodobně je bude nutné dodatečně nainstalovat.</p>
+
+<p>Rada pro začátečníky: Pokud přeci jenom zkusíte Vi - klasik říká, že zkusit se má všechno - na ukončení vždy zabere posloupnost Esc :q!</p>
+
+<div class="img"><img src="./data/nano.png" width="486" height="342" alt="" /><br />Velice jednoduchý textový editor nano</div>
+
+
+<h2>Multimediální programy</h2>
+
+<p>V textovém režimu?! A proč ne? V Linuxu jde všechno ;-) Pro prohlížení obrázků můžete zkusit například program <a href="http://freshmeat.net/projects/fbi/">fbi</a> (framebuffer image viewer).</p>
+
+<p>Dalším programem, který po spuštění v textovém režimu využívá framebuffer, je přehrávač Mplayer. Vypíše-li po spuštění něco jako &quot;Couldn't open the X11 display&quot;, zkuste přidat argument -vo fbdev.</p>
+
+<pre>
+$ mplayer film.avi
+$ mplayer -vo fbdev film.avi
+</pre>
+
+<p>Pokud preferujete i na video čistě textový režim, můžete zkusit nějaký ascii přehrávač. Je to sice spíše rarita, ale i takové existují. Onehdy se mi z mc při ssh přístupu spustil přehrávač <a href="http://www.videolan.org/vlc/">VLC</a> v zajímavém textoidním režimu - zážitek opravdu na celý život :-)</p>
+
+<p>Mplayer lze bez problémů použít také na přehrávání hudby, nicméně asi bude lepší sáhnout po specializovaném softwaru, který umí vytvářet playlisty. Může jím být například <a href="http://www.stack.nl/~brama/mp3blaster.html">mp3blaster</a>, který podporuje přehrávání mp3, ogg, wav a sid.</p>
+
+<div class="img"><img src="./data/mp3blaster.png" width="486" height="342" alt="" /><br />Přehrávač hudby mp3blaster</div>
+
+
+<h2>Webové prohlížeče</h2>
+
+<p>Links a Lynx jistě znají také všichni, co alespoň jednou zavítali do textového režimu. Největším problémem při jejich používání je, že ne všichni weboví tvůrci optimalizují své stránky pro tyto, v dnešní době spíše speciální, prohlížeče :-(</p>
+
+<div class="img"><img src="./data/lynx.png" width="486" height="342" alt="" /><br />Root.cz v Lynxu</div>
+
+<p>Naproti tomu se lze setkat i s <a href="http://aa-project.sourceforge.net/">celými weby</a>, které nejsou v jiných prohlížečích nic moc. ...a ve FAQ, hned na prvním místě trůní otázka: &quot;Proč je text tak hnusně zelený?&quot;. Odpověď je velice jednoduchá: &quot;Zkuste jiný software. Je jen jediný správný prohlížeč - Lynx.&quot;</p>
+
+
+<h2>Elektronická pošta</h2>
+
+<p>Potřebujete-li jen něco narychlo odeslat, nejjednodušší je použít neinteraktivní program mail. Text zprávy se načítá ze standardního vstupu, takže jej lze, v případě krátkého oznámení, spojit rourou například s echem. Druhou možností je přesměrovat soubor uložený na disku.</p>
+
+<pre>
+$ echo 'Přijedu v šest' | mail -s předmět adresa@server.cz
+$ mail -s předmět adresa@server.cz &lt; text_zpravy.txt 
+</pre>
+
+<p>Pokud hledáte komplexní emailový klient pracující v textovém režimu, první člověk, kterého potkáte, vás s největší pravděpodobností odkáže na Mutt.</p>
+
+<div class="img"><img src="./data/mutt.png" width="486" height="342" alt="" /><br />Mutt</div>
+
+
+<h2>ICQ</h2>
+
+<p>Pro interaktivní komunikaci s okolím slouží výkonné centericq, které v sobě, kromě ICQ, integruje i mnoho dalších protokolů. Jsou jimi Yahoo!, AIM, IRC, MSN, Gadu-Gadu a Jabber.</p>
+
+<div class="img"><img src="./data/centericq.png" width="486" height="342" alt="" /><br />centericq</div>
+
+<p>Potřebujete-li s někým komunikovat a nemáte-li k dispozici žádný potřebný software, lze se vždy uchýlit k programu screen, který je sice primárně určen k naprosto jiným věcem, ale krizový, avšak velice efektní, chat zvládá také.</p>
+
+<p>Jediná překážka může spočívat v nutnosti přihlášení se obou komunikujících na společný uživatelský účet (telnet, ssh), takže tuto možnost raději využívejte výhradně jen s těmi, komu opravdu věříte.</p>
+
+<p>Zprovoznění je velice jednoduché, první osoba spustí screen bez parametrů a druhá s argumentem -x. Terminály se propojí a veškeré výstupy programů se budou zobrazovat na obou monitorech. Této techniky se v naprosté většině případů využívá při administraci systému, aby osoba, která něco neumí, mohla sledovat, jak to dělá ten druhý...</p>
+
+
+<h2>Někdy text nestíhá...</h2>
+
+<p>Celý tento článek byl o tom, v jakých oblastech práce na počítači se dá využít textový režim bez učení složitých příkazů. Bylo by ale vhodné uvést několik příkladů, kde už bohužel spíše nestíhá. Asi nejsložitější situace nastanou při nutnosti editování obrázků ala Gimp a při nutnosti používání kancelářského balíku ve stylu OpenOffice.org.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="konzole.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 25.08.2005</div>
+
+</body>
+</html>

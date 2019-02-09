@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (21)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (21)</h1>
+
+<p class="perex">Další oblastí knihovny SDL, kterou si popíšeme, bude API pro práci s CD-ROM. Po přečtení tohoto článku byste měli být schopni si vytvořit jednoduchý CD přehrávač, jenž zahrnuje přehrávání a pauzy, listování a pohyb ve skladbách a také vysouvání mechaniky pro vložení nového disku.</p>
+
+
+<h2>Inicializace CD-ROM</h2>
+
+<p>Aby bylo možné přehrávat hudbu z CD, je nejprve nutné ve funkci SDL_Init() zapnout symbolickou konstantou SDL_INIT_CDROM podporu CD mechanik. Tím je defakto základní inicializace hotová a může se přistoupit k vlastnímu programování.</p>
+
+<p>Dále se musí položit dotaz, je-li v počítači vůbec nějaká CD mechanika, bez ní to opravdu nepůjde :-]. Funkce SDL_CDNumDrives() poskytuje jejich celkový počet a pokud je nutné zjistit také systémová jména, lze použít SDL_CDName(). Za parametr se jí předávají čísla z rozsahu od nuly do počtu všech mechanik a vrací ukazatel na řetězec jako je /dev/cdrom, D:\ apod. Jedná se pouze o informativní hodnotu.</p>
+
+<pre>
+int SDL_CDNumDrives(void);
+const char *SDL_CDName(int drive);
+</pre>
+
+<p>Mechanika s daným pořadovým číslem, nultá je defaultní v systému, se otevře funkcí SDL_CDOpen(). Návratová hodnota představuje ukazatel na objekt struktury SDL_CD, které se budeme podrobně věnovat níže. Identifikátor se po skončení práce uvolňuje funkcí SDL_CDClose().</p>
+
+<pre>
+SDL_CD *SDL_CDOpen(int drive);
+void SDL_CDClose(SDL_CD *cdrom);
+</pre>
+
+<p>Poslední otevřená mechanika se stane v aplikaci defaultní. To znamená, že se na ni lze při volání funkcí odkazovat argumentem NULL, který je předán místo identifikátoru SDL_CD.</p>
+
+
+<h2>Informace o CD</h2>
+
+<p>Po vložení CD do mechaniky je nutné funkcí SDL_CDStatus() aktualizovat obsah CD_ROM struktury.</p>
+
+<pre>
+CDstatus SDL_CDStatus(SDL_CD *cdrom);
+</pre>
+
+<p>Návratová hodnota poslouží pro získání stavových informací. Je jí výčtový typ, který může nabývat hodnot CD_TRAYEMPTY, CD_STOPPED, CD_PLAYING, CD_PAUSED a CD_ERROR. SDL také poskytuje makro CD_INDRIVE() podávající informaci, zda je v mechanice nějaký disk.</p>
+
+<pre>
+#define CD_INDRIVE(status) ((int)status > 0)
+
+// Použití
+if(CD_INDRIVE(SDL_CDStatus(cdrom)))
+	ZacniPrehravat();
+</pre>
+
+<p>Struktura SDL_CD jednoznačně identifikuje otevřenou CD mechaniku a také podává informace o disku, který je do ní vložený. První dvě položky jsou dostupné obecně, ostatní jsou validní pouze s CD. Aktuálnost obsahu je dána posledním voláním funkce SDL_CDStatus().</p>
+
+<pre>
+typedef struct
+{
+	int id;			// Privátní identifikátor
+	CDstatus status;	// Stavové informace
+
+	int numtracks;
+	int cur_track;
+	int cur_frame;
+	SDL_CDtrack track[SDL_MAX_TRACKS+1];
+} SDL_CD;
+</pre>
+
+<p>CD je obecně organizováno do jedné nebo více stop (v angličtině track), v naprosté většině případů je v každé z nich uložena jedna skladba. Stopy se dále skládají z určitého počtu framů, což jsou bloky dat o velikosti cca. 2 kB, které představují základní stavební jednotky CD. Při normální rychlosti se za jednu sekundu přehraje 75 framů. Tato hodnota je v SDL definována jako symbolická konstanta CD_FPS.</p>
+
+<p>Numtracks uchovává počet stop na disku, cur_track obsahuje číslo aktuálně přehrávané stopy a cur_frame číslo přehrávaného framu ve stopě. Samozřejmě nesmí chybět ani pole stop. Jeho velikost je definována staticky konstantou SDL_MAX_TRACKS rovnající se 99.</p>
+
+<p>Struktura SDL_CDtrack popisuje jednotlivé stopy na CD, pro pochopení by měly stačit komentáře.<p>
+
+<pre>
+typedef struct
+{
+	Uint8 id;	// ID stopy
+	Uint8 type;	// SDL_AUDIO_TRACK nebo SDL_DATA_TRACK
+	Uint16 unused;
+	Uint32 length;	// Délka stopy ve framech
+	Uint32 offset;	// Offset ve framech od začátku disku
+} SDL_CDtrack;
+</pre>
+
+<p>SDL interně pracuje s framy, nicméně časové údaje lze velice jednoduše získat makrem FRAMES_TO_MSF(). Prvním argumentem je počet framů, který se má převést na čas, a do M, S, F budou uloženy minuty, sekundy a zbylý počet framů. Opačný směr je také možný - MSF_TO_FRAMES().</p>
+
+<pre>
+#define FRAMES_TO_MSF(f, M,S,F) \
+{				\
+	int value = f;		\
+	*(F) = value % CD_FPS;	\
+	value /= CD_FPS;	\
+	*(S) = value % 60;	\
+	value /= 60;		\
+	*(M) = value;		\
+}
+
+#define MSF_TO_FRAMES(M, S, F)	\
+		((M)*60*CD_FPS+(S)*CD_FPS+(F))
+</pre>
+
+<p>Pokud by byla potřeba pouze délka v sekundách, stačí jen obyčejné dělení frames / CD_FPS. V následujícím příkladě se vypíší informace o délce všech stop na CD.</p>
+
+<pre>
+int min, sec, fr;
+
+SDL_CDStatus(g_cdrom);// Aktualizace informací
+printf("Počet stop: %d\n", g_cdrom-&gt;numtracks);
+
+for(int i = 0; i &lt; g_cdrom->numtracks; i++)
+{
+	FRAMES_TO_MSF(g_cdrom-&gt;track[i].length, &min, &sec, &fr);
+	printf("Stopa %d: %5d = %d:%2d, %2d\n", i,
+			g_cdrom-&gt;track[i].length, min, sec, fr);
+}
+</pre>
+
+<p>Výstup bude u audio CD vypadat nějak takto.</p>
+
+<pre>
+Počet stop: 9
+Stopa 0: 10087 = 2:14, 37
+Stopa 1: 10568 = 2:20, 68
+Stopa 2: 18475 = 4:06, 25
+Stopa 3: 16778 = 3:43, 53
+Stopa 4: 11059 = 2:27, 34
+Stopa 5:  5423 = 1:12, 23
+Stopa 6: 15167 = 3:22, 17
+Stopa 7:  5851 = 1:18,  1
+Stopa 8: 11906 = 2:38, 56
+</pre>
+
+
+<h2>Přehrávání</h2>
+
+<p>Základní funkcí pro přehrávání je SDL_CDPlay(). Předává se jí počáteční frame a počet, který se má celkově přehrát. Pokud bude úspěšná vrátí nulu, jinak -1.</p>
+
+<pre>
+int SDL_CDPlay(SDL_CD *cdrom, int start, int length);
+</pre>
+
+<p>Mnohem častěji než SDL_CDPlay() se ale používá SDL_CDPlayTracks(), protože poskytuje snadnou volbu toho, co se má přehrávat.</p>
+
+<pre>
+int SDL_CDPlayTracks(SDL_CD *cdrom, int start_track,
+		int start_frame, int ntracks, int nframes);
+</pre>
+
+<p>Start_track a ntracks označují první přehrávanou stopu a jejich celkový počet. Start_frame je offsetem ve framech od počáteční stopy a nframes offsetem od poslední. Pokud budou poslední dva parametry nulové, přehrává se až do konce CD. Datové oblasti jsou automaticky přeskakovány. Následující tři příklady byly přebrány ze SDL dokumentace.</p>
+
+<pre>
+// Přehraje se celé CD
+if(CD_INDRIVE(SDL_CDStatus(cdrom)))
+	SDL_CDPlayTracks(cdrom, 0, 0, 0, 0);
+
+// Přehraje se poslední stopa
+if(CD_INDRIVE(SDL_CDStatus(cdrom)))
+	SDL_CDPlayTracks(cdrom, cdrom->numtracks-1, 0, 0, 0);
+
+// Přehraje 15 sekund ze druhé stopy
+if(CD_INDRIVE(SDL_CDStatus(cdrom)))
+	SDL_CDPlayTracks(cdrom, 1, 0, 0, CD_FPS*15);
+</pre>
+
+<p>Následují nezbytné funkce každého přehrávání. Mimochodem, pokud se nezavolá SDL_CDStop(), CD se přehrává i po ukončení aplikace!</p>
+
+<pre>
+int SDL_CDPause(SDL_CD *cdrom);	// Pozastavení
+int SDL_CDResume(SDL_CD *cdrom);// Obnovení
+int SDL_CDStop(SDL_CD *cdrom);	// Zastavení
+</pre>
+
+<p>Pomocí SDL_CDEject() lze disk vysunout z mechaniky.</p>
+
+<pre>
+int SDL_CDEject(SDL_CD *cdrom);
+</pre>
+
+
+<h2></h2>
+
+<p></p>
+
+
+<h2></h2>
+
+<p></p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>CD přehrávač</h3>
+
+<p>Program implementuje velice jednoduchý CD přehrávač, který umožňuje přechody mezi stopami, posuny při přehrávání, pozastavení a také vysunutí mechaniky. Po spuštění programu s volbou -h nebo --help se zobrazí ovládání. Všechny informace se vypisují do konzole.</p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_21_a.tar.gz">Příklad: Jednoduchý CD přehrávač</a></li>
+<li><a href="sdl_21.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Zdárně dokončili jsme dokončili zvuky a hudbu, příště se budeme věnovat vícevláknovému programování.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 04.07.2005</div>
+
+</body>
+</html>

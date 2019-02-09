@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D III.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D III.</h1>
+
+<p id="uvod">Hodně lidí si myslí, že je výhodnější používat Direct3D, protože v sobě standardně obsahuje podporu absolutně nejnovějších funkcí grafických karet. Jak je to ale s podporou vlastností, které OpenGL umí od samého počátku své existence?</p>
+
+
+<h3>Podpora &quot;starých&quot; funkcí</h3>
+
+<p>Mnoho lidí, mezi nimi i autor dříve uvedeného článku o UT 2004 si myslí, že cituji: <i>Bohužel je vidět, že v oblasti 3D grafiky se OpenGL nemůže DirectX v kvalitě obrazu rovnat. Zatímco DX 9.0 představuje hardwarovou podporu bump mapingu, pixel shaderů a krásných světelných efektů, musíme se v OpenGL spokojit s poněkud horší kvalitou obrazu.</i></p>
+
+<p>Z tohoto citátu je jasně vidět, že ABSOLUTNĚ neví, o čem mluví nebo v jeho případě dokonce píšou. Mohu jen odkázat na NeHe Tutoriály <a href="http://nehe.opengl.cz/tut_22.php" target="_blank">22 - Bump Mapping a Multitexturing</a> (tady je ale bump mapping počítán ještě softwarově :-( a <a href="http://nehe.opengl.cz/tut_47.php" target="_blank">47 - CG vertex shader</a>. Ukážu raději i screenshoty, těm by mohl rozumět více než zdrojovým kódům. (Nevíte, jestli existuje nějaký škodolibý smajlík? :-)</p>
+
+<div class="okolo_img"><a href="img/tut_22.jpg"><img src="img/n_tut_22.jpg" width="200" height="150" alt="Bump Mapping a Multitexturing" /></a><br />Bump Mapping (SW) a Multitexturing (HW)</div>
+
+<p></p><!--mezera mezi obrázky-->
+
+<div class="okolo_img"><a href="img/tut_47.jpg"><img src="img/n_tut_47.jpg" width="200" height="150" alt="Vertex shader (HW)" /></a><br />Vertex shader (HW)</div>
+
+<p>No, a co se týče světel, nevím, jestli je tohle v D3D <b>9.0</b> oproti jeho předchozím verzím nějaká převratná novinka (není), ty jsou v OpenGL od samého začátku - cca. 15 let.</p>
+
+<p>Na druhou stranu D3D ještě donedávna nemělo ani takové základní funkce jako backface culling <a href="#literatura">[3]</a>! Pro ty, co neví, o čem je řeč... Jakýkoli <span title="obrazec - trojúhelník, čtverec, výceúhelník">polygon</span> se vždy renderuje &quot;dvakrát&quot;, nejdříve přední strana a pak zadní (zjednodušeně řečeno) - samozřejmě v programu se vertexy definují pouze jednou. Když se podíváte na list papíru uvidíte přední stranu a po otočení zadní (ve skutečném světě už jako přední, pro OpenGL stále zadní).</p>
+
+<p>U uzavřených objektů, které nikdy nepůjdou vidět zevnitř (bedna ve scéně) nebo zvenku (skybox, místnost), se toho může využít a jednu stranu odstranit. V OpenGL stačí jediná funkce:</p>
+
+<pre>
+glCullFace(GL_FRONT);// Odstraňovat přední strany
+glCullFace(GL_BACK);// Odstraňovat zadní strany
+glCullFace(GL_FRONT_AND_BACK);// Odstraňovat obě strany
+</pre>
+
+<p>No dobře, dvě funkce, ještě se to musí zapnout...</p>
+
+<pre>
+glEnable(GL_CULL_FACE);
+</pre>
+
+<p>Abyste viděli názorně, o co se jedná, screenshot z NeHe Tutoriálu č. <a href="http://nehe.opengl.cz/tut_11.php" target="_blank">11 - Efekt vlnící se vlajky</a>. Mimochodem první OpenGL tutoriál, který jsem přeložil do češtiny...</p>
+
+<div class="okolo_img"><a href="img/tut_11.jpg"><img src="img/n_tut_11.jpg" width="200" height="150" alt="Přední strana vyplněná, zadní linkami" /></a><br />Přední strana vyplněná, zadní linkami</div>
+
+<p>Pozn.: Zde nebyl použit culling, ale tzv. módy polygonů - na tomto jde totiž culling vidět :-), ve skutečnosti při ořezání polygonu neuvidíte nic. Obě techniky pracují na stejném principu.</p>
+
+<pre>
+glPolygonMode(GL_BACK, GL_FILL);// Zadní strana vyplněná
+glPolygonMode(GL_FRONT, GL_LINE);// Přední strana mřížkou
+</pre>
+
+<p>Abychom trochu zrychlili, o dalších základních věcech, které GL umí a D3D ne, pouze citát z <a href="#literatura">[3]</a>:</p>
+
+<p><i>OpenGL v immediate módu umí všechno to, co Direct3D, a navíc poskytuje další funkce, jako třeba odstraňování zadních stěn před vykreslením (face-culling), správu šablon a paměti textur, trojrozměrné textury, akumulační buffer (používá se třeba k navození efektu rychlého pohybu s rozmazáním - motion blur), podporu parametrických křivek a ploch, atd.</i></p>
+
+<p>Pozn.: Tento zdroj je už relativně starý (min. 3 roky), takže u nových verzí DX už všechno nemusí být pravda (např. zmíněný face-culling).</p>
+
+<p>Na druhou stranu se zabývá i věcmi, které D3D umí lépe:</p>
+
+<p><i>OpenGL i Direct3D používají Goraudovo stínování. Direct3D má teoretické předpoklady i pro Phonogovo stínování, které by posunulo grafický výstup blíže k realitě, tato funkce však nebyla dosud implementována. Protějškem display-list módu OpenGL je u Direct3D tzv. retained mode. Tady poskytuje Direct3D podstatně lepší služby než OpenGL. Objekty na scéně je možné seskupovat do hierarchických struktur, s kterými se dá pracovat na objektovém principu. Podobné funkce jsou u OpenGL dostupné pouze prostřednictvím určitých rozšíření. Za vymoženosti nového přístupu potom programátor zaplatí sníženým výkonem programu.</i></p>
+
+<p>BTW: Goraudovo a Phongovo stínování - nikdy jsem se nedočetl, jaký je mezi nimi rozdíl, snad jen to, že Phongovo je lepší. Všude bývá uvedeno, že ho OpenGL narozdíl od DirectX nepodporuje... a vždycky u této zprávy bývá malými písmeny, že v DirectX ještě není implementováno :-).</p>
+
+<p>Příště se podíváme na podporu nových vlastností grafických karet, ty vás asi budou zajímat více.</p>
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

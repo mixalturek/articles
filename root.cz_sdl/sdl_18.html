@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (18)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (18)</h1>
+
+<p class="perex">V tomto díle konverzemi zvuků dokončíme popis funkcí, které SDL poskytuje pro audio. Druhá část článku bude věnována rozšiřující knihovně SDL_sound, která slouží pro dekódování zvuků z .MP3, .MID, .OGG a dalších běžně rozšířených typů souborů.</p>
+
+
+<h2>Konverze zvuků</h2>
+
+<p>Transformace zvuků z jednoho formátu na jiný je v SDL dvoustupňový proces. Nejprve je nutné vytvořit objekt struktury SDL_AudioCVT, nastavit ho na správné parametry a nakonec ho předat jako parametr do konverzní funkce.</p>
+
+<pre>
+typedef struct
+{
+	int needed;
+	Uint16 src_format;
+	Uint16 dest_format;
+	double rate_incr;
+	Uint8 *buf;		// Buffer s daty
+	int len;		// Délka originálu
+	int len_cvt;
+	int len_mult;		// Výpočet délky pro alokaci
+	double len_ratio;	// Výpočet výsledné délky
+	void (*filters[10])(struct SDL_AudioCVT *cvt, Uint16 format);
+	int filter_index;
+} SDL_AudioCVT;
+</pre>
+
+<p>Většina atributů struktury může být považována za privátní, budeme se proto zabývat jen těmi, které jsou důležité pro používání.</p>
+
+<p>Buf je ukazatelem na zvuk a to jak zdrojový, tak cílový. Původní data tedy budou konverzí přepsána novými. Druhým důsledkem je, že se data mohou při konverzi zvětšit, a tudíž je nutné alokovat dostatek paměti. Číselně by měla být velká len*len_mult bytů, kde len představuje velikost původních dat a len_mult obsahuje násobitel kolikrát se mohou maximálně zvětšit, typickým příkladem je konverze 8-bitového zvuku na 16-bitový.</p>
+
+<p>Len_ratio má podobný význam jako len_mult. Výsledkem násobení len*len_ratio bude po úspěšné konverzi opravdová délka nových dat v bytech.</p>
+
+<p>Předtím než může být objekt SDL_AudioCVT použit pro konverzi, musí být inicializován informacemi o zdrojovém a cílovém formátu. K tomu slouží funkce SDL_BuildAudioCVT(), jejíž parametry jsou stejné jako u struktury SDL_AudioSpec probrané v minulém díle. Informace o zdrojovém zvuku jsou dostupné z načítání a u cíle se v naprosté většině případů volí formát hardwaru ze SDL_OpenAudio().</p>
+
+<pre>
+int SDL_BuildAudioCVT(SDL_AudioCVT *cvt,
+		Uint16 src_format, Uint8 src_channels, int src_rate,
+		Uint16 dst_format, Uint8 dst_channels, int dst_rate);
+</pre>
+
+<p>Funkce v případě úspěchu vrátí 1 a v případě neúspěchu -1. Byla-li úspěšná, může se do parametru len konverzní struktury přiřadit délka originálních dat, alokovat paměť pro buffer o velikosti len*len_mult bytů a zkopírovat do něj data zvuku. Pro samotnou konverzi se pak zavolá funkce SDL_ConvertAudio(), jejímž jediným parametrem je konverzní struktura. Úspěch označuje vrácená 0 a neúspěch -1.</p>
+
+<pre>
+int SDL_ConvertAudio(SDL_AudioCVT *cvt);
+</pre>
+
+<p>Pokud vše proběhne bez problémů, budou výsledná data uložena v atributu buf struktury a jejich délka bude len*len_ratio bytů.</p>
+
+<p>V prvním ukázkovém programu naleznete obecně použitelnou funkci LoadSound(), která nahraje zvuk ze souboru filename, zkonvertuje ho pomocí právě popsané techniky na libovolný formát a výsledek uloží na adresu svého posledního parametru. Kód není vložen přímo do článku kvůli relativně velké délce.</p>
+
+
+<h2>Knihovna SDL_sound</h2>
+
+<p>SDL_sound je knihovna určená pro nahrávání zvuků mnoha populárních formátů a jejich dekódování. Aktuálně podporovanými podle dokumentace jsou</p>
+
+<ul>
+<li>.WAV (Microsoft WAVfile RIFF data, interně)
+<li>.VOC (Creative Labs' Voice formát, interně)
+<li>.MP3 (MPEG-1 Layer 3, prostřednictvím SMPEG a mpglib)
+<li>.MID (MIDI hudba konvertovaná na Waveform data, interně)
+<li>.MOD (MOD formát, prostřednictvím MikMod a ModPlug)
+<li>.OGG (Ogg formát, prostřednictvím Ogg Vorbis knihoven)
+<li>.SPX (Speex formát, prostřednictvím libspeex)
+<li>.SHN (Shorten formát, interně)
+<li>.RAW (Raw zvuková data v jakémkoli formátu, interně)
+<li>.AU  (Sun's Audio formát, interně)
+<li>.AIFF (Audio Interchange formát, interně)
+<li>.FLAC (Lossless audio komprese, prostřednictvím libFLAC)
+</ul>
+
+<p>Knihovna je šířena pod licencí GNU LGPL, nicméně externí dekodéry mohou mít licenci jinou. Asi nejlepší bude, když si přečtete soubor COPYING z kořenového adresáře archivu knihovny a následně jednotlivé licence všech v aplikaci používaných formátů.</p>
+
+<p>Při použití je nutné přidat k parametrům linkeru řetězec -lSDL_sound, který způsobí přilinkování knihovny k programu. Hlavičky všech funkcí jsou umístěny v souboru SDL_sound.h a jejich jména začínají na jednotnou předponu 'Sound_'. Pokud nebude v textu uvedeno jinak, bude daná funkce vracet při chybě nulu, jinak nenulovou hodnotu.</p>
+
+<p>Následující funkce jsou podobné svým SDL analogiím. Mělo by stačit uvést, že Sound_Init() by mělo být voláno jako první ze všech Sound_*() funkcí. Naproti tomu Sound_Quit() uvolní všechny systémové prostředky alokované knihovnou SDL_sound a mělo by být umístěno v kódu vždy před SDL_Quit().</p>
+
+<pre>
+int Sound_Init(void);			// Inicializace
+int Sound_Quit(void);			// Deinicializace
+const char *Sound_GetError(void);	// Vrátí chybový řetězec
+void Sound_ClearError(void);		// Vynuluje ho
+</pre>
+
+<p>Zjištění, které dekodéry jsou aktuálně dostupné, lze provést funkcí Sound_AvailableDecoders(), která vrací ukazatel na pole struktur s informacemi o dekodérech. Poslední položka je zarážkou a má hodnotu NULL.</p>
+
+<pre>
+const Sound_DecoderInfo **Sound_AvailableDecoders(void);
+
+typedef struct
+{
+	const char **extensions;	// Přípona souboru
+	const char *description;	// Popis dekodéru
+	const char *author;		// Autor
+	const char *url;		// URL dekodéru
+} Sound_DecoderInfo;
+</pre>
+
+
+<h2>Loading zvuků</h2>
+
+<p>Zvukový soubor v libovolném podporovaném formátu se do aplikace dá nahrát jednou ze dvou níže uvedených funkcí. První z nich slouží pro nahrávání ze SDL_RWops (SDL abstrakce nad vstupními daty), parametr ext je pouze nápovědou při hledání vhodného dekodéru. Druhá funkce slouží pro načítání z diskového souboru.</p>
+
+<pre>
+Sound_Sample *Sound_NewSample(SDL_RWops *rw,
+		const char *ext,
+		Sound_AudioInfo *desired,
+		Uint32 bufferSize);
+
+Sound_Sample *Sound_NewSampleFromFile(const char *fname,
+		Sound_AudioInfo *desired,
+		Uint32 bufferSize);
+</pre>
+
+<p>Parametrem desired lze určit do jakého formátu má být zvuk při dekódování zkonvertován. V případě, že nejsou konverze potřeba, může být nastaven na NULL. Všechny tři atributy mají ve struktuře SDL_AudioSpec své analogie, takže k inicializace stačí pouze tři jednoduchá přiřazení.</p>
+
+<pre>
+typedef struct
+{
+	Uint16 format;	// Formát zvuku
+	Uint8 channels;	// 1 - mono, 2 - stereo
+	Uint32 rate;	// Frekvence (vzorky za sekundu)
+} Sound_AudioInfo;
+</pre>
+
+<p>Poslední parametr, bufferSize, určuje počáteční velikost čtecího bufferu v bytech. Čím je větší, tím více dekódování může být provedeno v jednom bloku, na druhou stranu bude trvat o něco déle a bude zabráno více zdrojů. Pro různé formáty mohou být vhodné jiné hodnoty, každopádně velikost musí být vždy násobkem velikosti vzorku. Pokud používáte například 16-bitové stereo, kde zabírá každý vzorek 2*2 bytů, musí být velikost násobkem 4.</p>
+
+<p>Obě funkce vrací ukazatel na objekt struktury Sound_Sample, která je pro SDL_sound důležitá asi stejně, jako SDL_Surface pro SDL. Tento objekt ukládá všechny informace o zvukových datech a stavu jejich dekódování. Atributy by měly být považovány za READ-ONLY, pro jejich změny se využívají výhradně API funkce.</p>
+
+<pre>
+typedef struct
+{
+	void *opaque;			// Interní použití
+	const Sound_DecoderInfo *decoder;// Používaný dekodér
+	Sound_AudioInfo desired;	// Formát pro konverze
+	Sound_AudioInfo actual;		// Aktuální formát vzorku
+	void *buffer;			// Buffer dekódovaných dat
+	Uint32 buffer_size;		// Velikost bufferu v bytech
+	Sound_SampleFlags flags;	// Flagy vzorku
+} Sound_Sample;
+</pre>
+
+<p>Po skončení práce by se měly všechny používané zdroje uvolnit. Slouží k tomu funkce Sound_FreeSample(), stačí jí předat ukazatel na nahraný zvuk.</p>
+
+<pre>
+void Sound_FreeSample(Sound_Sample *sample);
+</pre>
+
+
+<h2>Dekódování dat</h2>
+
+<p>Voláním funkce Sound_Decode() se dekódují ze vzorku v pořadí následující data. Jejich velikost bude většinou sample-&gt;buffer_size bytů a budou uložena do sample-&gt;buffer. Návratová hodnota dává informaci kolik bytů bylo skutečně nahráno.</p>
+
+<pre>
+Uint32 Sound_Decode(Sound_Sample *sample);
+</pre>
+
+<p>Pokud nelze nahrát všech sample-&gt;buffer_size bytů, informace o důvodu se dají najít v sample-&gt;flags. Většinou se jedná o konec streamu (SOUND_SAMPLEFLAG_EOF) nebo o nějakou chybu (SOUND_SAMPLEFLAG_ERROR).</p>
+
+<pre>
+if(sample->flags & SOUND_SAMPLEFLAG_ERROR)
+	NecoUdelej();
+</pre>
+
+<p>Pro dekódování všech zvukových dat slouží funkce Sound_DecodeAll(), která do sample-&gt;buffer dynamicky alokuje potřebnou paměť a uloží do ní výsledná data, sample-&gt;buffer_size bude obsahovat jejich velikost. Opět by se měly testovat flagy ze sample-&gt;flags.</p>
+
+<pre>
+Uint32 Sound_DecodeAll(Sound_Sample *sample);
+</pre>
+
+<p>Při dekódování celého zvuku najednou si raději dávejte pozor na velikost alokované paměti, sami jistě přijdete na to, jak by to dopadlo u půlhodinové mp3.</p>
+
+<p>Změna velikosti čtecího bufferu se dá uskutečnit funkcí Sound_SetBufferSize(). Pro hodnotu nové velikosti platí stejné zásady, jako u Sound_NewSample().</p>
+
+<pre>
+int Sound_SetBufferSize(Sound_Sample *sample, Uint32 new_size);
+</pre>
+
+<p>V případě, že se nedá velikost změnit, bude se pracovat i nadále s původní. Při zkrácení budou data na konci zahozena a při prodloužení bude konec bufferu nedefinovaný do té doby, než se nahrají nová data.</p>
+
+
+<h2>Skoky na nové pozice</h2>
+
+<p>Základním skokem je přesun na začátek zvuku, který se vykoná funkcí Sound_Rewind(). Teoreticky by k chybě nemělo nikdy dojít.</p>
+
+<pre>
+int Sound_Rewind(Sound_Sample *sample);
+</pre>
+
+<p>Druhá funkce, Sound_Seek(), umožňuje přesun na libovolné místo definované časem v milisekundách od začátku.</p>
+
+<pre>
+int Sound_Seek(Sound_Sample *sample, Uint32 ms);
+</pre>
+
+<p>Některé dekodéry nemusejí přeskoky vůbec podporovat a některé pouze s určitými soubory, proto byste měli před dotazem otestovat flagy na SOUND_SAMPLEFLAG_CANSEEK. Pokud přesun selže, měl by se zvuk chovat, jako by volání nikdy nebylo provedeno. Při neošetřitelné chybě jsou flagy nastaveny na SOUND_SAMPLEFLAG_ERROR.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Konverze zvuků</h3>
+
+<p>Program demonstruje přehrávání více zvuků najednou. Jeden bude hudbou ve smyčce na pozadí a druhý bude spouštěn vždy po stisku mezerníku. Při nahrávání funkcí LoadSound() se zvuky zkonvertují na stejný (hardwarový) formát. <a href="./src/sdl_18_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h3>SDL_sound</h3>
+
+<p>Program ukazuje nahrávání zvuku ve formátu .AU pomocí knihovny SDL_sound, jeho dekódování a následné přehrávání (opět pro jednoduchost smyčka). Je zde použit .AU, ale naprosto stejným způsobem lze nahrávat zvukové soubory jakýchkoli jiných podporovaných formátů (.MP3, .OGG, atd.), stačí jen změnit jméno souboru. <a href="./src/sdl_18_b.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="http://icculus.org/SDL_sound/">Domovská stránka knihovny SDL_sound</a></li>
+<li><a href="./src/sdl_18_a.tar.gz">Příklad: Konverze zvuků</a></li>
+<li><a href="./src/sdl_18_b.tar.gz">Příklad: SDL_sound</a></li>
+<li><a href="sdl_18.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Dnes už na původně slibovanou knihovnu SDL_mixer nezbylo místo, takže příště...</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 19.06.2005</div>
+
+</body>
+</html>

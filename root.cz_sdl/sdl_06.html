@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (6)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (6)</h1>
+
+<p class="perex">V tomto dílu budeme dále rozvíjet naše znalosti o SDL grafice. Předvedeme si například, jak vyplnit surface barvou, jak docílit toho, aby určitá barva byla transparentní (průhledná), jak nastavit průhlednost i takového surface, který neobsahuje alfa kanál, a další užitečné věci.</p>
+
+
+<h2>Vytvoření prázdného surface</h2>
+
+<p>Prázdný SDL_Surface se dá v programu vytvořit pomocí funkce SDL_CreateRGBSurface(). První čtyři parametry jistě není třeba popisovat, jsou jimi flagy, šířka, výška a barevná hloubka. Bity masek definují pořadí barevných složek v pixelu, označují tedy, jestli bude obrázek uložen jako RGB, BGR popř. v jiném formátu. U osmi a čtyř bitové barevné hloubky bude alokována prázdná paleta.</p>
+
+<pre>
+SDL_Surface *SDL_CreateRGBSurface(Uint32 flags,
+		int width, int height, int depth,
+		Uint32 Rmask, Uint32 Gmask,
+		Uint32 Bmask, Uint32 Amask);
+
+SDL_Surface *SDL_CreateRGBSurfaceFrom(void *pixels,
+		int width, int height, int depth, int pitch,
+		Uint32 Rmask, Uint32 Gmask,
+		Uint32 Bmask, Uint32 Amask);
+</pre>
+
+<p>Při vytváření surface je vhodné specifikovat masky v závislosti na pořadí bytů, které se používá na dané platformě (little/big endian). SDL definuje symbolickou konstantu SDL_BYTEORDER, jež se rovná buď hodnotě SDL_LIL_ENDIAN, nebo SDL_BIG_ENDIAN.</p>
+
+<p>Například při vytváření textury pro OpenGL je vhodné podle následujícího příkladu vytvořit pomocný surface, voláním SDL_Blit() do něj pixely zkopírovat, tím se transformují do správného formátu, a až poté vytvořit texturu.</p>
+
+<pre>
+SDL_Surface *surface = SDL_CreateRGBSurface(
+		SDL_SWSURFACE,
+		128, 128, 32,
+#if SDL_BYTEORDER == SDL_LIL_ENDIAN
+		0x000000FF,
+		0x0000FF00,
+		0x00FF0000,
+		0xFF000000
+#else
+		0xFF000000,
+		0x00FF0000,
+		0x0000FF00,
+		0x000000FF
+#endif
+		);
+</pre>
+
+
+<h2>Ořezávací obdélník surface</h2>
+
+<p>Příkazem SDL_SetClipRect() lze surface &quot;virtuálně ořezat&quot;, pro funkce se pak bude chovat, jako by měl definovánu tuto novou velikost. Maximální rozměry mohou být následně obnoveny předáním NULL. Uvedená vlastnost se bere v úvahu, když se do surface kreslí, ne když je kreslen!</p>
+
+<p>Pokud funkce vrátí SDL_FALSE, obdélník neprotínal surface a při vykreslování se tedy nezobrazí nic. Zasahuje-li alespoň část obdélníku do surface, je vráceno SDL_TRUE a při kreslení se bude brát v úvahu oblast průniku.</p>
+
+<pre>
+SDL_bool SDL_SetClipRect(SDL_Surface *surface, SDL_Rect *rect);
+void SDL_GetClipRect(SDL_Surface *surface, SDL_Rect *rect);
+</pre>
+
+<p>Pomocí druhé uvedené funkce lze získat aktuální ořezávací roviny obdélníku.</p>
+
+
+<h2>Specifikace barvy</h2>
+
+<p>Kvůli mnoha různým formátům surface - zvláště paletovým - může být výběr barvy komplikovanější, než by se na první pohled mohlo zdát. Naštěstí SDL poskytuje příkazy, které se umí postarat o všechny detaily.</p>
+
+<pre>
+Uint32 SDL_MapRGB(SDL_PixelFormat *fmt,
+		Uint8 r, Uint8 g, Uint8 b);
+Uint32 SDL_MapRGBA(SDL_PixelFormat *fmt,
+		Uint8 r, Uint8 g, Uint8 b, Uint8 a);
+</pre>
+
+<p>První parametr funkce je formátem pixelů, který daný surface používá (většinou surface->format), a ostatní představují jednotlivé RGB(A) složky. Barva je vrácena jako 32-bitové číslo, jenž je buď přímo požadovanou barvou, nebo, v případě paletového pixel formátu, barvou která se nachází v paletě a nejvíce se blíží požadované.</p>
+
+<p>Opačný směr, tedy získání RGB(A) složek barvy z pixelu, zprostředkovávají funkce</p>
+
+<pre>
+void SDL_GetRGB(Uint32 pixel, SDL_PixelFormat *fmt,
+		Uint8 *r, Uint8 *g, Uint8 *b);
+void SDL_GetRGBA(Uint32 pixel, SDL_PixelFormat *fmt,
+		Uint8 *r, Uint8 *g, Uint8 *b, Uint8 *a);
+</pre>
+
+
+<h2>Vyplnění surface barvou</h2>
+
+<p>Funkce SDL_FillRect() se většinou používá ke změně barvy pozadí okna, ale lze ji použít na libovolný surface.</p>
+
+<pre>
+int SDL_FillRect(SDL_Surface *dst, SDL_Rect *dstrect, Uint32 color);
+</pre>
+
+<p>První parametr představuje surface, na který bude operace aplikována a druhý omezuje velikost obarvované plochy. Pokud by byl tento obdélník nastaven na NULL, předpokládá se vyplnění celého surface. Color určuje barvu.</p>
+
+<p>Obsahuje-li surface ořezávací obdélník, bude vyplněn pouze jeho průnik s dstrect a dstrect bude nastaven na rozměry vyplněné oblasti. Následující příklad nastaví pozadí okna na červenou barvu.</p>
+
+<pre>
+// Červené pozadí okna
+SDL_FillRect(g_screen, NULL, SDL_MapRGB(g_screen->format, 255, 0, 0));
+</pre>
+
+
+<h2>Nastavení klíčové (průhledné) barvy</h2>
+
+<p>Transparentní barva surface se dá nastavit pomocí funkce SDL_SetColorKey(). Při blittingu nebudou pixely této barvy vykresleny.</p>
+
+<pre>
+int SDL_SetColorKey(SDL_Surface *surface, Uint32 flag, Uint32 key);
+</pre>
+
+<p>Za parametr flag se při této operaci musí předat symbolická konstanta SDL_SRCCOLORKEY, předáním nuly se transparentní barva zruší. Následujícím příkazem se v surface zprůhlední růžové pixely.</p>
+
+<pre>
+SDL_SetColorKey(surface, SDL_SRCCOLORKEY,
+		SDL_MapRGB(surface->format, 255, 0, 255));
+</pre>
+
+<p>Pokud je flag binárně ORován se SDL_RLEACCEL, bude surface vykreslován s použitím RLE akcelerace. To je výhodné u spojitých oblastí průhledných pixelů (na řádcích). Surface je pro použití RLE akcelerace zakódován při prvním předání do funkce SDL_BlitSurface() nebo SDL_DisplayFormat().</p>
+
+
+<h2>Alfa hodnota surface</h2>
+
+<p>Pomocí funkce SDL_SetAlpha() lze nastavit globální úroveň průhlednosti, která bude aplikována na každý pixel surface.</p>
+
+<pre>
+int SDL_SetAlpha(SDL_Surface *surface, Uint32 flag, Uint8 alpha);
+</pre>
+
+<p>Parametr flag musí být nastaven na SDL_SRCALPHA a může být, stejně jako u předešlé funkce, ORován se SDL_RLEACCEL. Poslední parametr specifikuje úroveň alfy. Nula (SDL_ALPHA_TRANSPARENT) má význam úplné průhlednosti a 255 (SDL_ALPHA_OPAQUE) značí neprůhlednost. Speciální hodnotou je 128, která je určitým způsobem optimalizována, takže blitting bude rychlejší než u jiných hodnot. Při použití této techniky nesmí mít surface alfa kanál, použila by se alfa jednotlivých pixelů.</p>
+
+
+<h2>Nastavení palety</h2>
+
+<p>Barvy v paletě osmibitového a čtyřbitového surface se dají nastavit pomocí funkce SDL_SetColors().</p>
+
+<pre>
+int SDL_SetColors(SDL_Surface *surface, SDL_Color *colors,
+		int firstcolor, int ncolors);
+</pre>
+
+<p>Funkci se předává ukazatel na daný surface, pole barev, první barvu a celkový počet barev. Pokud byly úspěšně nastaveny všechny barvy, je vrácena jednička. Pokud některé byly nastaveny a některé ne, je vrácena nula. V takovém případě by měl programátor zjistit ze surface nově vzniklou paletu. Nejedná-li se o paletový surface, nic se neprovede a je vrácena také nula.</p>
+
+<p>Je-li předaný surface asociován s oknem a byl-li v SDL_SetVideoMode() definován flag SDL_HWPALETTE, vrátí tato funkce vždy jedničku a nastavení palety je vždy garantováno.</p>
+
+<p>V případě, že se jedná o framebuffer s hardwarovým surface, obsahuje vždy dvě palety, logickou (používají ji funkce pro blitting) a fyzickou (používá ji hardware k mapování na obrazovku). Aby je bylo možné specifikovat odděleně, musí mít framebuffer nastaven již zmíněný flag SDL_HWPALETTE. K oddělené specifikaci palet pak slouží funkce</p>
+
+<pre>
+int SDL_SetPalette(SDL_Surface *surface, int flags,
+		SDL_Color *colors, int firstcolor,
+		int ncolors);
+</pre>
+
+<p>Parametr flags může být nastaven buď na hodnotu SDL_LOGPAL (logická paleta), nebo na SDL_PHYSPAL (fyzická paleta), většinou se modifikuje pouze jedna z nich, čímž se dociluje různých efektů. Volání SDL_SetPalette() s parametrem flags nastaveným na SDL_LOGPAL | SDL_PHYSPAL je ekvivalentem SDL_SetColors().</p>
+
+<p>V SDL manuálu se u popisu těchto funkcí nachází příklad na nastavení palety úrovně šedi.</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Vlastnosti surface</h3>
+
+<p>Podstata tohoto programu tkví především ve vykreslovací funkci. Surface okna je zmenšen pomocí SDL_SetClipRect() tak, aby u okrajů vznikla deseti pixelová mezera. Poté je vykresleno červené pozadí a do každého rohu stejný obrázek, ale s jinými vlastnostmi.</p>
+
+<p>V levém horním rohu se nachází originál tak, jak byl nahrán z disku, u obrázku vpravo je bílá barva pixelů nastavena na transparentní. Vlevo dole byla nastavena 50% průhlednost a vpravo dole se nachází kombinace obou. Je důležité poznamenat, že obrázek je ve formátu RGB, bez alfa kanálu. <a href="./src/sdl_06_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/06_prog_a.png" width="328" height="269" alt="Vlastnosti surface" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_06_a.tar.gz">Příklad: Vlastnosti surface</a></li>
+<li><a href="sdl_06.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>V příští části se budeme věnovat přímému přístupu k pixelům surface a změně kurzoru myši.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 25.02.2005</div>
+
+</body>
+</html>

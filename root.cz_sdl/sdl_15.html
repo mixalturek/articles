@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (15)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (15)</h1>
+
+<p class="perex">V dnešním dílu o knihovně SDL dokončíme popis událostního systému. Budeme se mimo jiné věnovat změnám velikosti okna, jeho aktivacím a deaktivacím, posílání uživatelských zpráv a dalším věcem, které ještě zbývá probrat.</p>
+
+
+<h2>Ukončení aplikace</h2>
+
+<p>Požadavek na ukončení posílá operační systém/správce oken, když z nějakého důvodu požaduje po aplikaci, aby se ukončila. Ve většině případů se jedná o pokus uživatele zavřít okno programu.</p>
+
+<p>Dalším důvodem pro vložení SDL_QUIT do fronty může být příchozí signál od operačního systému. SDL_Init() vždy instaluje handlery pro SIGINT (přerušení klávesnicí) a SIGTERM (požadavek na ukončení od operačního systému). Pokud programátor handlery pro tyto signály nevytvoří, jsou použity defaultní, které generují událost SDL_QUIT. U ní nelze žádným způsobem zjistit, z jakého důvodu byla poslána, ale nastavením handleru může být standardní chování přepsáno.</p>
+
+<p>SDL_QUIT je nejjednodušší ze všech událostí. V SDL_Event sice existuje objekt struktury SDL_QuitEvent (event.quit), ten však neobsahuje jinou informaci, než je typ události.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type
+} SDL_QuitEvent;
+</pre>
+
+<p>Nejvhodnější reakcí na tuto zprávu je buď rovnou ukončit aplikaci, nebo, ve výjimečných případech, začít s ukončovacím dialogem, jako je zobrazení hlavního menu hry a podobně.</p>
+
+<p>Kdykoli v programu se lze pomocí SDL_QuitRequested() zeptat, jestli náhodou nebyl vznesen požadavek na ukončení, v takovém případě vrátí toto makro nenulovou hodnotu.</p>
+
+
+<h2>Změna velikosti okna</h2>
+
+<p>Změnu velikosti okna oznamuje SDL posláním zprávy SDL_VIDEORESIZE, která v event.resize, objektu struktury SDL_ResizeEvent, poskytuje novou šířku a výšku okna.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	int w, h;
+} SDL_ResizeEvent;
+</pre>
+
+<p>V reakci na událost by měla být zavolána funkce SDL_SetVideoMode() (viz <a href="sdl_04.html">4. díl</a>), která aktualizuje velikost klientské oblasti okna, do níž program kreslí.</p>
+
+<p>Pozn.: V MS Windows s OpenGL způsobuje SDL_SetVideoMode() jisté problémy, viz <a href="sdl_08.html">8. díl</a> věnovaný OpenGL a SDL.</p>
+
+<p>Pokud chceme z nějakého důvodu zakázat uživateli, aby mohl změnit velikost okna, není nic snazšího, než NEpředat funkci SDL_SetVideoMode() parametr SDL_RESIZABLE.</p>
+
+
+<h2>Požadavek na překreslení</h2>
+
+<p>Událostí SDL_VIDEOEXPOSE oznamuje SDL programu, že je z nějakého důvodu nutné překreslit obsah okna. Tento stav může nastat, když je okno modifikováno vně aplikace, obvykle správcem oken. Objekt struktury SDL_ExposeEvent, jenž lze najít v event.expose, neobsahuje kromě typu žádné parametry.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type
+} SDL_ExposeEvent;
+</pre>
+
+
+<h2>(De)aktivace okna</h2>
+
+<p>Přijde-li aplikaci zpráva SDL_ACTIVEEVENT, znamená to, že uživatel okno buď aktivoval nebo deaktivoval (např. minimalizace). Specifické informace se pak hledají v event.active.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	Uint8 gain;
+	Uint8 state;
+} SDL_ActiveEvent;
+</pre>
+
+<p>Proměnná gain má v případě deaktivace nulovou hodnotu, jednička naopak označuje aktivaci. State může být nastaveno celkem na tři různé konstanty: SDL_APPMOUSEFOCUS, SDL_APPINPUTFOCUS a SDL_APPACTIVE.</p>
+
+<p>První z nich vyjadřuje, že okno ztratilo/získalo fokus myši, což defakto znamená, že myš opustila nebo dosáhla oblasti okna. U druhé je předmětem zájmu klávesnice. Tento parametr obyčejně vyjadřuje, že se jiná aplikace stala aktivní. Konečně poslední možnost oznamuje minimalizaci, respektive obnovení minimalizovaného okna.</p>
+
+<p>Podobným stylem, jako se přistupovalo ke klávesnici nebo myši, se lze dotazovat i na stav okna. Funkce SDL_GetAppState() vrací kombinaci tří, výše zmíněných, symbolických konstant.</p>
+
+<pre>
+Uint8 SDL_GetAppState(void);
+</pre>
+
+<p>Deaktivační událost se hodí například v případě, kdy kvůli animacím periodicky překreslujeme scénu. Je zbytečné, aby se tato činnost prováděla i tehdy, je-li okno minimalizované, protože uživatel nemá šanci cokoli zahlédnout.</p>
+
+<p>Zachytí-li aplikace v příkladu níže minimalizaci okna (událost SDL_ACTIVEEVENT, state obsahuje SDL_APPACTIVE a gain je nulový), je zavolána funkce SDL_WaitEvent(), která uspí program. Parametr NULL v tomto případě říká, že nechceme, aby byla událost, jež probudí aplikaci, odstraněna z fronty.</p>
+
+<pre>
+// Zpracování událostí
+case SDL_ACTIVEEVENT:
+	if(event.active.state &amp; SDL_APPACTIVE)
+	{
+		if(event.active.gain == 0)
+		{
+			SDL_WaitEvent(NULL);
+		}
+	}
+	break;
+</pre>
+
+<p>Tento kód však nemusí fungovat vždy! Je to způsobeno tím, že ve frontě může být za právě zpracovávanou událostí ještě nějaká další, která způsobí okamžité ukončení SDL_WaitEvent() a opětovné spuštění programu.</p>
+
+<p>Řešení může spočívat v přesunutí SDL_WaitEvent() mimo událostní smyčku do podmínky třeba if(wait), kde wait je bool proměnná nastavená na true na stejném místě, na kterém se v tuto chvíli nachází SDL_WaitEvent(). Funkce se tedy spustí až tehdy, máme-li jistotu, že je fronta prázdná.</p>
+
+<p>Mimochodem, další důležitou podmínkou, aby se dala aplikace uspat, je vypnutí všech systémových časovačů - generují zprávy, které by opět vedly k předčasnému probuzení.</p>
+
+
+<h2>Uživatelské události</h2>
+
+<p>Pamatujete, jak jsme v <a href="sdl_11.html">11. díle</a> popisovali funkci SDL_PushEvent()? Řekli jsme si, že uvnitř aplikace se neposílají standardní, ale většinou tzv. uživatelské události. Při jejich používání musí program zajistit nejen jejich zpracování, ale také posílání.</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	int code;
+	void *data1;
+	void *data2;
+} SDL_UserEvent;
+</pre>
+
+<p>Parametr type může nabývat hodnot z rozsahu SDL_USEREVENT až SDL_NUMEVENTS-1. Vzhledem k tomu, že má SDL_USEREVENT hodnotu 24 a celkový počet je 32, není počet událostí nijak závratný. Řešením může být druhý parametr, jenž může být použit, stejně jako vše u uživatelských událostí, naprosto libovolným způsobem - čili i na rozlišení &quot;typu&quot; události. Tímto malým podvodem se jejich počet právě rozrostl, v případě 32 bitového procesoru, z původních osmi na několik desítek miliard (přesně 8 * 2<sup>32</sup>).</p>
+
+<p>Díky tomu, že jsou další dva parametry datového typu ukazatelů na void, mohou se spolu s událostmi posílat naprosto libovolná data (resp. ukazatele na ně), jejich velikost navíc není omezena.</p>
+
+<p>V následujícím příkladu pošleme funkci zpracovávající události testovací zprávu. Pro jednoduchost bude bez parametrů.</p>
+
+<pre>
+// Nejlépe do vyhrazeného hlavičkového souboru
+#define USR_EVT_MOJE_UDALOST 0
+
+// Kdekoli v kódu
+SDL_Event event;
+
+event.type = SDL_USEREVENT;
+event.user.code = USR_EVT_MOJE_UDALOST;
+event.user.data1 = NULL;// Bez parametrů
+event.user.data2 = NULL;
+SDL_PushEvent(&amp;event);
+</pre>
+
+<p>Pozn.: Doporučuji vytvořit si nějaký speciální hlavičkový soubor, ve kterém se budou uchovávat jména/kódy všech uživatelských událostí hezky přehledně na jednom místě. U větších projektů, zvlášť když se na vývoji podílí více lidí, se pak nedostanete do situace, kdy si začnete říkat 'Ne, událost číslo 15 už bude určitě zabraná, ale 735689 by ještě mohla být volná ;-)'.</p>
+
+<p>Uživatelská událost se dá ošetřit úplně stejně, jako kterákoli jiná, podrobnosti se tentokrát nacházejí v podobjektu event.user.</p>
+
+<pre>
+// Zpracování událostí
+case SDL_USEREVENT:
+	switch(event.user.code)
+	{
+	case USR_EVT_MOJE_UDALOST:
+		// K parametrům by se přistupovalo takto:
+		// param1 = (pretypovani*)event.user.data1;
+		// param2 = (pretypovani*)event.user.data2;
+		NecoUdelej();
+		break;
+
+	default:
+		break;
+	}
+	break;
+</pre>
+
+
+<h2>Systémově závislé události</h2>
+
+<p>Poslední typ událostí, které ještě zbývá probrat, jsou události závislé na systému, v němž aplikace běží. Program samozřejmě nikdy nedostává zprávy, které se běžně používají v SDL, ale jen jejich ekvivalenty poskytované daným systémem.</p>
+
+<p>Například pošle-li MS Windows zprávu WM_KEY_DOWN, SDL ji přeloží na SDL_KEYDOWN a umístí do fronty zpráv. U jiného systému se událost stisku klávesy může jmenovat úplně jinak, ale díky SDL program pracuje vždy jen s obecnou zprávou SDL_KEYDOWN.</p>
+
+<p>Pro události, které nemají svůj ekvivalent, poskytuje SDL speciální událost SDL_SYSWMEVENT, která je v sobě všechny zahrnuje. Podrobnosti se hledají v event.syswm. Vkládání těchto událostí do fronty je standardně vypnuté, zapnutí je umožněno klasicky pomocí funkce SDL_EventState().</p>
+
+<pre>
+typedef struct
+{
+	Uint8 type;
+	SDL_SysWMmsg *msg;
+} SDL_SysWMEvent;
+</pre>
+
+<p>Jediným parametrem události je ukazatel na objekt struktury SDL_SysWMmsg. Ta je pomocí komplikovaných příkazů preprocesoru deklarována v hlavičkovém souboru SDL_syswm.h vždy pro daný systém, na němž se program právě kompiluje. Například pro zprávy MS Windows vypadá deklarace struktury následovně (Win32 programátorům jistě povědomá).</p>
+
+<pre>
+struct SDL_SysWMmsg
+{
+	SDL_version version;
+	HWND hwnd;
+	UINT msg;
+	WPARAM wParam;
+	LPARAM lParam;
+};
+</pre>
+
+<p>Systémovým událostem další prostor věnován nebude. Tyto techniky jsou především naprosto nepřenositelné, u kódu napsaného pro MS Windows nelze předpokládat, natož ani doufat, že půjde pod Linuxem a to samé samozřejmě platí i opačným směrem.</p>
+
+<p>SDL běží na desítkách systémů, zkusíte-li implementovat danou funkčnost pro každý zvlášť, většinou skončíte se dvěma nebo maximálně se třemi nejpoužívanějšími, které jsou pro vás dostupné, a ostatní jednoduše podporovány nebudou.</p>
+
+<p>Navíc, pokud se pustíte do využívání událostí závislých na systému, pravděpodobně máte dostatek znalostí, že to zvládnete i bez pomoci tohoto seriálu...</p>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Menu</h3>
+
+<p>Ukázkový program demonstruje vytvoření jednoduchého menu, které je zapouzdřené do speciální třídy (resp. do dvou). Rodičovské QMenu se stará o operace, jako je vkládání položek, pohyb v menu, posílání událostí apod., a potomek QSDLMenu o vykreslování. Nechcete-li použít pro vykreslování SDL/SDL_ttf, ale například OpenGL, není nic snazšího než naprogramovat dalšího potomka, základní funkčnost zůstává zachována v QMenu.</p>
+
+<p>Pozn.: To písmenko Q na začátku, označuje třídy z jedné mé knihovničky (zatím soukromá, neustále spousta změn). Tímto programem jsem defakto zaplácl dvě mouchy jednou ranou - ukázkový program ke článku a menu do semestrální práce z C++ ;-)</p>
+
+<p>Co se týče funkcí programu, tak jednotlivé položky menu umožňují výběr obrázku na pozadí, skrytí menu a ukončení aplikace. Mezi položkami se dá pohybovat šipkami a výběr zprostředkovává klávesa enter. Po jejím stisknutí generuje třída uživatelskou událost, jejíž zpracování je už na aplikaci.</p>
+
+<p>Zdrojový kód se zvýrazněním syntaxe: <a href="./src/sdl_15_a.html">aplikace</a>, <a href="./src/sdl_15_a_qmenu_h.html">qmenu.h</a>, <a href="./src/sdl_15_a_qmenu_cpp.html">qmenu.cpp</a>, <a href="./src/sdl_15_a_qsdlmenu_h.html">qsdlmenu.h</a>, <a href="./src/sdl_15_a_qsdlmenu_cpp.html">qsdlmenu.cpp</a></p></p>
+
+<div class="img"><img src="./data/15_prog_a.png" width="322" height="259" alt="Menu" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_15_a.tar.gz">Příklad: Menu</a></li>
+<li><a href="sdl_15.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Příště se budeme zabývat timery, FPS regulací rychlosti a v podstatě všemu s tematikou času.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 03.05.2005</div>
+
+</body>
+</html>

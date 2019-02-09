@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D II.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D II.</h1>
+
+<p id="uvod">Knihovny jako OpenGL nebo DirectX nejsou pro uživatle až tak důležité, pro ně jsou to jenom dvě prázdná jména. Může jim být naprosto jedno, jak program uvnitř funguje. Návrh a hlavně celková použitelnost API je důležitá primárně pro programátory. Právě oni s ním pracují, nikdo jiný. V tomto díle budeme porovnávat především délku kódu, který se musí napsat, aby program něco udělal.</p>
+
+
+<h3>Programátorské hledisko</h3>
+
+<p>Narozdíl od strukturovaného OpenGL je Direct3D objektově orientované. Jaký je mezi tím rozdíl? V případě OpenGL se na začátku programu vytvoří okno s jeho podporou a pak je možné odkudkoli volat jakékoli OpenGL specifické funkce. V případě Direct3D se musí vytvořit objekt Direct3D (IDirect3D9), s jeho pomocí zařízení Direct3D (IDirect3DDevice9) a přes volání jejich metod programátor pracuje. Objektově orientované programování sice preferuji také, ale v případě DirectX mi připadá hodně těžkopádné - alespoň v porovnání s OpenGL.</p>
+
+<p>Jedním z nejdůležitějších charakteristik jakéhokoli <span title="Application Programming Interface - Aplikační programové rozhranní">API</span> je pro programátora délka zdrojového kódu, který musí napsat, aby program něco udělal. John Carmack, autor her Quake, uvádí <a href="#literatura">[3]</a>, že kód programu plnící stejnou funkci je v Direct3D i čtyřikrát delší než v OpenGL. Můžeme si to bez problémů ověřit. Z učebnice Direct3D <a href="#literatura">[1]</a>, str. 180, 181 uvedu jednoduchou renderovací funkci, která na černém pozadí vykresluje jeden obarvený trojúhelník - bez textur, světel či jakýchkoli maticových operací (translace, rotace). Následně vše přepíši do OpenGL.</p>
+
+<pre>
+///////////////////////////////////////////
+// Direct3D 9.0
+///////////////////////////////////////////
+
+struct VLASTNIVERTEX
+{
+  FLOAT x, y, z, rhw;
+  DWORD barva;
+}
+
+void Vykresleni()
+{
+  VLASTNIVERTEX vrchTrojuhl[] =
+  {
+    {400.0, 180.0, 0.0, 1.0, D3DCOLOR_XRGB(255,0,0)},
+    {500.0, 380.0, 0.0, 1.0, D3DCOLOR_XRGB(0,255,0)},
+    {300.0, 380.0, 0.0, 1.0, D3DCOLOR_XRGB(0,0,255)},
+  };
+
+  IDirect3DVertexBuffer9* pVertexBuffer = NULL;
+  HRESULT hVysledek = g_pZarizeniDirect3D-&gt;CreateVertexBuffer(
+    3*sizeof(VLASTNIVERTEX), 0, D3DFVF_XYZRHW | D3DFVF_DIFFUSE,
+    D3DPOOL_DEFAULT, &amp;pVertexBuffer, NULL);
+
+  if (FAILED(hVysledek))
+  {
+    DXTRACE_ERR(&quot;Chyba při vytv. vertex bufferu.&quot;, hVysledek);
+  }
+
+  VOID* pVrcholy;
+  hVysledek = pVertexBuffer-&gt;Lock(0, 0, (viod**)&amp;pVrcholy, 0);
+  if (FAILED(hVysledek))
+  {
+    DXTRACE_ERR(&quot;Chyba při zamyk. vertex bufferu.&quot;, hVysledek);
+  }
+  memcpy(pVrcholy, vrchTrojuhl, sizeof(vrchTrojuhl));
+  pVertexBuffer-&gt;Unlock();
+
+  g_pZarizeniDirect3D-&gt;Clear(0, NULL, D3DCLEAR_TARGET,
+    D3DCOLOR_XRGB(0,0,0), 1.0, 0);
+  g_pZarizeniDirect3D-&gt;SetStreamSource(0, pVertexBuffer, 0,
+    sizeof(VLASTNI_VERTEX));
+  g_pZarizeniDirect3D-&gt;SetFVF(D3DFVF_XYZRHW | D3DFVF_DIFFUSE);
+  g_pZarizeniDirect3D-&gt;BeginScene();
+  g_pZarizeniDirect3D-&gt;DrawPrimitive(D3DPT_TRIANGLELIST, 0, 1);
+  g_pZarizeniDirect3D-&gt;EndScene();
+
+  g_pZarizeniDirect3D-&gt;Present(NULL, NULL, NULL, NULL);
+
+  if (pVertexbuffer)
+    pVertexBuffer-&gt;Release();
+}
+</pre>
+
+<p>To samé v OpenGL...</p>
+
+<pre>
+///////////////////////////////////////////
+// OpenGL
+///////////////////////////////////////////
+
+void Vykresleni()
+{
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glLoadIdentity();
+
+	glBegin(GL_TRIANGLES);
+		glColor3ub(255,0,0); glVertex2i(400,480);
+		glColor3ub(0,255,0); glVertex2i(500,380);
+		glColor3ub(0,0,255); glVertex2i(300,380);
+	glEnd();
+
+	glFlush();
+	SDL_GL_SwapBuffers();
+}
+</pre>
+
+<p>Pozn.: Při inicializaci se nesmí definovat perspektiva, ale pravoúhlá projekce (glOrtho()) o rozměrech 800x600. Funkce glClearColor() se obvykle dává také do inicializace, ve vykreslení je jen kvůli tomu, aby kód plně odpovídal Direct3D. Pokud provozujete OpenGL ve Win32 API, určitě používáte místo SDL_GL_SwapBuffers() funkci SwapBuffers(), SDL má tu výhodu, že lze kód bez větších problémů přenášet mezi Linuxem, Windows a dalšími operačními systémy.</p>
+
+<div class="okolo_img"><a href="img/rgb_triangle.png"><img src="img/n_rgb_triangle.png" width="200" height="150" alt="RGB trojúhelník" /></a><br />Screenshot OpenGL verze programu</div>
+
+<p>Vrátím se ještě k té délce kódu, v případě, že byste je chtěli porovnat číselně, pak D3D verze měla celkem 47 řádků, 108 slov a 1367 písmen, OpenGL pouze 14 řádků, 22 slov a 335 písmen. V poměru to činí u řádků 47 / 14 = 3.35, slov 108 / 22 = 4.9 a znaků 1367 / 335 = 4.08 ...čtyřnásobná délka kódu tedy plus mínus platí. Zčásti je to i tím, že v D3D sekci byly použity dlouhé identifikátory, ale za to já nemůžu, jak jsem napsal výše, jedná se o doslovný přepis z učebnice D3D. Dokonce jsem identifikátor vrcholyTrojuhelniku musel zkrátit pouze na vrchTrojuhl, aby se kód vešel na řádek.</p>
+
+<pre>
+[woq@localhost tmp]$ wc *txt
+  47  108 1367 dx.txt
+  14   22  335 gl.txt
+</pre>
+
+<p>Uživatele programu zdrojové kódy absolutně nezajímají a hlavně jim nerozumí, takže nepředpokládám, že jste předchozí výpisy zkoumali podrobně. Jenom tak jimi v rychlosti prolétněte a zkuste říci, který z nich je přehlednější. Dále si všimněte v D3D sekci kódu řádku if(FAILED(hVysledek)), který se provede při chybě ve vytváření/zamykání vertex bufferu. V OpenGL se toto dělat nemusí/nelze a to ani při použití vertex arrays, které více odpovídají D3D stylu programování.</p>
+
+<p>Nic podobného, jako je samostatné volání funkcí glVertex*() Direct3D neumí. Vertex arrays jsou sice výhodnější při renderování velkých množství souvisejících <span title="bodů">vertexů</span>, které jsou vždy na konstantní pozici (3D světy, výškové mapy, 3D modely ap.), protože odpadají ztráty na výkonu při mnoha volání funkcí, nicméně u pohyblivých nesouvisejících trojúhelníků, kde často ani nebývá dopředu znám jejich počet (typicky částicové systémy) bývá použití vertex arrays těžkopádné a spíše méně vhodné, navíc se zbytečně alokuje systémová paměť. V OpenGL si může programátor zvolit, co považuje za výhodnější. Pokud je chytrý a používá extensiony, může všechna data dokonce uložit v paměti grafické karty jako tzv. <span title="Vertex Buffer Object">VBO</span>, tím se eliminuje vliv &quot;délky drátů&quot; při posílání dat na grafickou kartu. Ale toto pravděpodobně jde i v D3D.</p>
+
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

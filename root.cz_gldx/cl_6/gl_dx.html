@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="ISO-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cz" lang="CZ">
+<head>
+
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta http-equiv="content-script-type" content="text/javascript" />
+<meta http-equiv="content-style-type" content="text/css" />
+
+<meta name="robots" content="all, follow" />
+<meta name="resource-type" content="document" />
+
+<meta name="description" content="Porovnání 3D grafických knihoven OpenGL a Direct3D" />
+<meta name="keywords" content="opengl, gl, directx, dx, direct3d, d3d, 3d, grafika" />
+<meta name="author" content="all: Michal Turek - Woq; woq (zavináč) seznam.cz" />
+<meta name="copyright" content="Copyright (c) 2004 Michal Turek - Woq" /><!-- Než to vyjde na root.cz :-] -->
+
+<title>OpenGL a Direct3D VI.</title>
+
+<link href="style.css" rel="stylesheet" type="text/css" media="all" />
+<link href="print.css" rel="stylesheet" type="text/css" media="print" />
+
+</head>
+<body>
+
+<div id="text_stranky">
+
+<h1>OpenGL a Direct3D VI.</h1>
+
+<p id="uvod">Jelikož náš seriál vychází na serveru, který se primárně zabývá Linuxovými technologiemi, zkusíme porovnat, jak snadno respektive obtížně lze přenést OpenGL a Direct3D programy do tohoto a dalších ne-Windows systémů. Dále se podíváme i na rychlost renderingu.</p>
+
+
+<h3>Přenositelnost programů</h3>
+
+<p>Právě se dostáváme k opravdové lahůdce. Dosud jsem nezmínil, že DirectX je vázáno na technologii <span title="Common Object Model">COM</span> navrženou, stejně jako DirectX, Microsoftem. Nebudu se o ní zbytečně rozepisovat především proto, že v podstatě nevím, o co jde :-). Nicméně co vím s naprostou jistotou, je to, že funguje výhradně pod Windows.</p>
+
+<p>Co se dá ještě říci o přenositelnosti DirectX? Asi jen to, že dříve nefungovalo ani ve Windows NT <a href="#literatura">[3]</a>. Po odklonu Microsoftu od &quot;dosovských Windows&quot; (Win 9x) se s tím však muselo něco udělat, takže v současnosti funguje, když nikde jinde, tak alespoň ve všech Windows (tedy 9x, Me, NT, 2000, XP), což ovšem např. uživatelům Linuxu, MacOS a dalších až tak stačit nemusí :-(</p>
+
+<p>Naproti tomu je OpenGL od samého začátku koncipováno jako nezávislé na platformě, operačním systému (a programovacím jazyce). V současnosti ho lze najít téměř všude: Unix-like systémy (IRIX, Unix, Linux, Sun Solaris, Free/Open/Net-BSD...), Dos-like systémy (MS-Dos (neviděl jsem to, ale prý ano <a href="#literatura">[3]</a>), Win 3.x, Windows 9x, Me), Windows NT-like (Windows NT, 2000, XP, IBM OS/2), MacOS, BeOS a dalších. Lze ho najít i na některých palmtopech <a href="#literatura">[3]</a>.</p>
+
+<p>Teoreticky (toto je jen můj postřeh) by mohlo fungovat i na mobilech s Javou, protože nejnovější verze tohoto programovacího jazyka OpenGL přímo podporují. Otázkou je především rychlost a to, jestli v mobilech není pouze nějaká osekaná verze - s tímto opravdu nemám zkušenosti.</p>
+
+<p>Bohužel, jak už to bývá, mnoho programátorů jednu z nejdůležitějších vlastností OpenGL, přenositelnost, doslova vyhazuje oknem (toto není narážka na <b>ten</b> OS, ale jen slovní obrat :-), protože váží své aplikace na nepřenositelné systémové API - většinou Win32 API. Existuje množství knihoven, díky kterým mohou být OpenGL programy s velmi malým úsilím libovolně přenositelné na úrovni zdrojových kódů. Jmenuji pouze dvě, pravděpodobně nejpoužívanější, se kterými mám (kromě Win32 API) nějaké zkušenosti: <span title="OpenGL Utility Toolkit">GLUT</span> a <span title="Simple DirectMedia Layer">SDL</span>. GLUT zná asi každý OpenGL programátor, takže se mu moc věnovat nebudu. Dá se říci, že je to (oficiální) rozšíření OpenGL o nejvíce systémově závislé funkce, jako je vytváření oken a práce s nimi.</p>
+
+<p><a href="http://www.libsdl.org/" target="_blank">SDL</a> je doma na Linuxu, jedná se o knihovnu určenou primárně pro tvorbu 2D her, ale díky tomu, že přímo podporuje OpenGL, není problém ani s 3D grafikou. Používám ji od té doby, co jsem přešel na Linux (už to bude skoro rok) a v současnosti pracuji na základním kódu pro OpenGL aplikace, který je/bude kompletně vystavěn na SDL a jeho podknihovnách (SDL_Image, SDL_Sound, SDL_Net aj.). Takže až někde uvidíte nápis <strong>Free3D (33D) Basecode</strong>, je to moje práce :-). Zatím je to sice projekt jednoho člověka, ale kdyby se chtěl někdo přidat...</p>
+
+<div class="okolo_img"><a href="img/fps_kde.png"><img src="img/n_fps_kde.png" width="200" height="150" alt="OpenGL pod Linuxem (KDE - Plastik)" /></a><br />OpenGL pod Linuxem (KDE - Plastik)</div>
+
+<p></p><!--mezera mezi obrázky-->
+
+<div class="okolo_img"><a href="img/fps_enlight.png"><img src="img/n_fps_enlight.png" width="200" height="150" alt="OpenGL pod Linuxem (Enlightenment)" /></a><br />OpenGL pod Linuxem (Enlightenment)</div>
+
+<p></p><!--mezera mezi obrázky-->
+
+<div class="okolo_img"><a href="img/fps_win.png"><img src="img/n_fps_win.png" width="200" height="150" alt="OpenGL pod MS Windows XP" /></a><br />OpenGL pod MS Windows XP</div>
+
+<h3>Rychlost renderingu</h3>
+
+<p>Jedna z posledních věcí, které se budeme v tomto článku věnovat, je rychlost OpenGL a Direct3D programů. Původně jsem chtěl z internetu stáhnout nějaké Direct3D zdrojové kódy a přepsat je do OpenGL, nicméně mě upoutal v <a href="#literatura">[3]</a> začátek jednoho odstavce: <i>Přímé srovnání grafického výkonu OpenGL a Direct3D je docela komplikované, protože obě API mají trochu jiné konečné určení. OpenGL a Direct3D je navíc třeba srovnávat pouze pod Windows, protože jinde Direct3D nechodí.</i></p>
+
+<p>Než jsem tedy začal stahovat D3D programy, zkusil jsem nejprve OpenGL program, na kterém právě dělám (ten částicový systém výše), spustit pod Mandrake 10.0 Linuxem a následně ve Windows XP (na stejném počítači), jiné operační systémy jsou pro mě v tuto chvíli nedostupné.</p>
+
+<p>To, co teď napíšu, rozhodně neberte jako &quot;další kydání na Windows&quot;. Abych pravdu řekl, výsledná FPS mě, stejně jako určitě i vás, totálně šokovala. Přestože se jednalo o naprosto stejný zdrojový kód zkompilovaný akorát pro dva různé systémy, byly výsledky extrémně odlišné. Pro kompilaci bylo ve Windows použito vývojové prostředí MS Visual C++ 6.0 a v Linuxu standardní g++ (KDevelop):</p>
+
+<pre>
+[woq@localhost tmp]$ g++ --version
+g++ (GCC) 3.3.2 (Mandrake Linux 10.0 3.3.2-6mdk)
+Copyright (C) 2003 Free Software Foundation, Inc.
+This is free software; ...atd.
+</pre>
+
+<p>Následující tabulka vyjadřuje hodnoty FPS programu po ustálení v &quot;klidovém stavu počítače&quot; - tzn. nic se nemačká na klávesnici, nehýbá se myší apod. Jsou uvedeny minimální a maximální hodnoty. Možná by bylo lepší spočítat průměr za např. tisíc překreslení, ale nechtělo se mi s tím hrát - rozdíly jsou tak zřetelné, že hovoří za vše.</p>
+
+<center><table>
+<thead>
+<tr><td></td>					<td colspan="2"><b>FPS - OpenGL</b></td></tr>
+<tr><td></td>					<td><b>Okno</b></td>	<td><b>Fullscreen</b></td></tr>
+</thead>
+<tbody>
+<tr><td><b>Win XP</b></td>			<td>37.0 až 38.5</td>	<td>58.8 až 62.5</td></tr>
+<tr><td><b>Linux (KDE)</b></td>		<td>62.5 až 66.7</td>	<td>76.9 až 71.4</td></tr>
+<tr><td><b>Linux (Enlightenment)</b></td>	<td>38.0 až 83.0</td>	<td>42.0 až 93.0</td></tr>
+</tbody>
+</table></center>
+
+<p>Pozn.: Námitka, že to dělá stáří Visual C++ (vyšlo myslím 1998), neobstojí. Zkoušel jsem to i v nejnovějším Dev-C++ a hodnoty byly prakticky stejné. Navíc ve Windows byl kromě testovaného programu spuštěn pouze Total Commander, kdežto v Linuxu mám standardně po pracovních plochách rozházených nejméně deset dalších aplikací ((průměrně) 5 KWritů, Operu, Konqueror, Gimp, KDevelop, Konzoli, do toho Apache, MySQL... je toho fakt hodně).</p>
+
+<p>Kvůli těmto ne zrovna pozitivním výsledkům (ve Windows) jsem se rozhodl, porovnání s DirectX neprovádět, opravdu asi záleží hodně na tom, pod jakým systémem se spustí. Mimochodem, to víte, že OpenGL běží ve Windows vlastně na Direct3D? I když to v programu nikde explicitně neurčíte, po spuštění v Debug (F5 ve Visual C++), se zobrazí TRACE() zpráva ohledně DDRAW.DLL. Kdysi jsem o tom viděl i nadpis nějakého článku na <a href="http://www.opengl.org/" target="_blank">http://www.opengl.org/</a>.</p>
+
+<p>A ještě si neodpustím jednu zmínku o rychlosti DirectX. Kdysi se v počítačových časopisech rozšířila zpráva, že se po instalaci nové verze (buď 6 nebo 7, už nevím) zvýší výkon grafické karty až o 40 procent. Všichni jásali, ale napadlo vůbec někoho: &quot;A nešlo to udělat pořádně už v té minulé verzi?!&quot;.</p>
+
+
+<a id="literatura"></a>
+<h3>Literatura</h3>
+
+<ul>
+<li>[0] Vlastní zkušenosti s 3D grafikou</li>
+<li>[1] Clayton Walnum: Programujeme grafiku v Microsoft&reg; Direct3D (9.0), Computer Press 2004, první vydání, 358 stran</li>
+<li>[2] Chip 01/2004, Hardwarový fotorealismus: Možnosti moderních 3D grafických akcelerátorů, str. 96-100)</li>
+<li>[3] <a href="http://nehe.opengl.cz/cl_gl_referat.pdf" target="_blank">Daniel Čech: OpenGL - Referát na praktikum z informatiky (PDF)</a> - Opravdu kvalitní text</li>
+<li>[4] <a href="http://nehe.opengl.cz/cl_sdl_hry.pdf" target="_blank">Bernard Lidický: Několik poznámek k tvorbě počítačových her (PDF)</a> - Věnuje se především tématům, jaké hry programovat a v čem (přenositelné knihovny Allegro a SDL)</li>
+<li>[5] <a href="http://www.root.cz/clanek/2314">Linuxové hry (47): Unreal Tournament 2004</a> - Hlavní impuls pro vznik tohoto článku</li>
+</ul>
+
+
+<div>Pro server <a href="http://www.root.cz/">root.cz</a> napsal</div>
+<div>Michal Turek - Woq <span class="m">&lt;WOQ (zavináč) seznam.cz&gt;</span></div>
+
+</div><!-- div id="text_stranky" -->
+
+</body>
+</html>

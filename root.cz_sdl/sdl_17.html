@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (17)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (17)</h1>
+
+<p class="perex">V dnešním díle o knihovně SDL začneme nový tematický celek, budou jím zvuky a hudba, které přinesou konec všem tichým aplikacím.</p>
+
+
+<h2>Zvuky v počítači</h2>
+
+<p>Asi to už budete znát, ale pro jistotu uvedu alespoň velice stručný úvod do zpracování audia počítačem. Zvuk je ve své podstatě vlnění - analogová veličina, která se na digitální signál převádí tzv. vzorkováním. Vždy po uplynutí předem stanoveného časového intervalu se odebere &quot;vzorek&quot; zvuku, což je číslo udávající hodnotu signálu v daném okamžiku, a uloží se do paměti.</p>
+
+<p>Při posílání posloupnosti vzorků na zvukovou kartu jsou vytvářeny aproximace původních zvukových vln. Výslednou kvalitu tedy ovlivňuje jak frekvence, se kterou byly vzorky odebrány, tak jejich velikost. Běžně podporovaným audio formátem je 16 bitový vzorek na 22 kHz, což je kompromis mezi výslednou kvalitou a velikostí potřebné paměti pro uložení.</p>
+
+
+<h2>SDL a audio</h2>
+
+<p>Knihovna SDL poskytuje nízkoúrovňový přístup pro práci s audiem navržený jako základ pro implementaci softwarového zvukového mixeru. Na první pohled by se mohlo zdát, že si musí naprostou většinu funkčnosti napsat programátor sám, nicméně je možné používat již hotový mixer v podobě rozšiřující knihovny SDL_mixer, který odstraní většinu námahy.</p>
+
+<p>Pokud tedy z nějakého důvodu potřebujete nízkoúrovňový přístup, zvolte si samotné SDL, a pokud preferujete jednoduše volatelné funkce, vždy můžete jít cestou SDL_mixeru. My se budeme věnovat oběma způsobům. Začneme funkcemi, které poskytuje SDL.</p>
+
+<p>Podobně, jako u grafiky, i zvuků lze zvolit ovladač, který bude zprostředkovávat přehrávání. Jejich dostupnost je závislá především na nainstalování v systému a pak také konfiguračními volbami při kompilaci SDL.</p>
+
+<p>Zvolení konkrétního ovladače se dá provést přiřazením jména požadovaného ovladače do systémové proměnné SDL_AUDIODRIVER, o všechny podrobnosti se postará SDL. V Linuxu jsou dostupné například dsp, dma, esd, artsc, ve Win32 dsound a waveout.</p>
+
+<p>V běžící aplikaci se dá jméno aktuálně používaného driveru zjistit voláním funkce SDL_AudioDriverName(). Předává se jí alokovaná paměť, do které se má informace uložit, a proti přetečení také její velikost.</p>
+
+<pre>
+char *SDL_AudioDriverName(char *namebuf, int maxlen);
+</pre>
+
+<p>Předpokladem pro to, aby šly v SDL aplikaci zvuky vůbec používat, je předání symbolické konstanty SDL_INIT_AUDIO do inicializační funkce SDL_Init(). Pak je samozřejmě nutné nahrát do aplikace nějaké zvuky a případně je zkonvertovat do požadovaného formátu. Teprve potom se může přistoupit k otevření audio zařízení a samotnému přehrávání.</p>
+
+<p>Menší zvláštností oproti jiným knihovnám je, že se musí definovat tzv. callback funkce, kterou bude SDL volat pokaždé, když zvukové kartě dojdou data a bude nutné poslat do streamu nová data.</p>
+
+
+<h2>Struktura SDL_AudioSpec</h2>
+
+<p>Tato struktura se používá ke specifikaci formátu audia, používá se především při otevírání zařízení a také při nahrávání zvuků a jejich konverzích na požadovaný formát.</p>
+
+<pre>
+typedef struct
+{
+	int freq;
+	Uint16 format;
+	Uint8 channels;
+	Uint16 samples;
+	Uint8 silence;
+	Uint32 size;
+	void (*callback)(void *userdata, Uint8 *stream, int len);
+	void *userdata;
+} SDL_AudioSpec;
+</pre>
+
+<p>Atribut freq udává počet vzorků za sekundu (čili frekvenci vzorkování), běžnými hodnotami jsou 11025, 22050 a 44100. Format specifikuje formát audio dat, může nabývat hodnot několika symbolických konstant (viz SDL manuál), které určují, zda je hodnota vzorků osmi nebo šestnácti bitová, znaménková/bezznaménková apod. Channels udává počet oddělených zvukových kanálů, jednička označuje mono a dvojka stereo.</p>
+
+<p>Proměnná samples ukládá velikost bufferu v počtu vzorků. Toto číslo by mělo být mocninou dvou a může být audio ovladačem upraveno na pro hardware vhodnější hodnotu. Většinou se volí z rozmezí od 512 do 8192 v závislosti na rychlosti procesoru. Nižší hodnoty mají kratší reakční čas, ale mohou způsobit podtečení v případě, že zaneprázdněná aplikace nestíhá plnit buffer. Stereo vzorek se skládá z obou kanálů v pořadí levý-pravý a jejich počet je vztažen k času podle vzorce ms = (počet vzorků * 1000) / frekvence.</p>
+
+<p>Silence a size jsou definovány automaticky. V prvním případě se jedná o hodnotu uloženou v bufferu, která reprezentuje ticho a v druhém jeho velikost v bytech.</p>
+
+<p>Callback představuje ukazatel na funkci, kterou SDL volá, když je audio zařízení připraveno přijmout nová data. Předává se jí ukazatel na buffer/stream, jehož délka se rovná len. Userdata je libovolný ukazatel na dodatečná data.</p>
+
+<pre>
+void callback(void *userdata, Uint8 *stream, int len);
+</pre>
+
+<p>Vzhledem k tomu, že plnění bufferu většinou běží v odděleném vláknu, měl by být přístup k datovým strukturám chráněn pomocí dvojice SDL_LockAudio() a SDL_UnlockAudio(). Je zaručeno, že po locknutí až do unlocku nebude callback volána a v žádném případě by naopak neměly být použity v callback funkci.</p>
+
+<pre>
+void SDL_LockAudio(void);
+void SDL_UnlockAudio(void);
+</pre>
+
+
+<h2>Otevření audio zařízení</h2>
+
+<p>Audio zařízení se otevírá pomocí SDL_OpenAudio(), kterému se v prvním parametru předává požadovaný formát. Funkce se pokusí tuto konfiguraci najít a výsledek hledání uloží do obtained, které se tak stává pracovní konfigurací. Ta může být následně použita například pro konverzi všech zvuků do hardwarového formátu. V případě úspěchu je vrácena nula, jinak -1.</p>
+
+<pre>
+int SDL_OpenAudio(SDL_AudioSpec *desired,
+		SDL_AudioSpec *obtained);
+</pre>
+
+<p>Bylo-li obtained volajícím nastaveno na NULL, budou se, v případě nedostupnosti požadovaného formátu, provádět automatické realtimové konverze do formátu podporovaného hardwarem.</p>
+
+<p>Aby se mohly bezpečně inicializovat data pro callback funkci plnící buffer, je po otevření audio implicitině pozastaveno. Spuštění zvukového výstupu se docílí zavoláním SDL_PauseAudio(0).</p>
+
+<pre>
+void SDL_PauseAudio(int pause_on);
+</pre>
+
+<p>Na aktuální stav se lze dotázat funkcí SDL_GetAudioStatus(), která vrací výčtový typ obsahující SDL_AUDIO_STOPPED, SDL_AUDIO_PAUSED nebo SDL_AUDIO_PLAYING.</p>
+
+<pre>
+SDL_audiostatus SDL_GetAudioStatus(void);
+</pre>
+
+<p>Po skončení práce s audiem by se nemělo zapomenout na jeho deinicializaci.</p>
+
+<pre>
+void SDL_CloseAudio(void);
+</pre>
+
+<p>Otevření audio zařízení by mohlo vypadat například takto.</p>
+
+<pre>
+// Prototyp callback funkce
+void AudioCallback(void *userdata, Uint8 *stream, int len);
+
+// Inicializace
+SDL_AudioSpec desired, obtained;
+
+desired.freq = 22050;		// FM Rádio kvalita
+desired.format = AUDIO_S16LSB;	// 16-bit signed audio
+desired.channels = 1;		// Mono
+desired.samples = 8192;		// Velikost bufferu
+desired.callback = AudioCallback;// Ukazatel na callback
+desired.userdata = NULL;	// Žádná uživatelská data
+
+// Otevře audio zařízení
+if(SDL_OpenAudio(&amp;desired, &amp;obtained) == -1)
+{
+	fprintf(stderr, "Unable to open audio: %s\n",
+			SDL_GetError());
+	return false;
+}
+
+// Příprava callbacku na hraní
+// Například loading všech zvuků, jejich konverze apod.
+// Obtained obsahuje aktuální konfiguraci
+
+// Spustí zvukový výstup
+SDL_PauseAudio(0);
+
+// Konec aplikace
+SDL_CloseAudio();
+</pre>
+
+
+<h2>Nahrávání zvuků</h2>
+
+<p>Samotné SDL umí nahrávat pouze .WAV formát souborů, který vzhledem ke své velikosti není pro praktické použití zrovna vhodný. V praxi se proto pro loading zvuků používají rozšiřující knihovny. Například SDL_sound nebo SDL_mixer si umí poradit i s .MID, .MP3, .OGG a dalšími běžně používanými formáty.</p>
+
+<pre>
+SDL_AudioSpec *SDL_LoadWAV(const char *file,
+		SDL_AudioSpec *spec,
+		Uint8 **audio_buf,
+		Uint32 *audio_len);
+</pre>
+
+<p>První parametr funkce SDL_LoadWAV() představuje diskovou cestu k souboru se zvukem, na adresu spec bude uložen formát nahraných audio dat. Samotná data se uloží do automaticky alokované paměti, jejíž adresa bude spolu s délkou předána zpět v posledních dvou parametrech.</p>
+
+<p>Funkce vrátí NULL, pokud nelze soubor otevřít, používá nepodporovaný formát nebo je poškozen. Typ chyby se dá zjistit následným SDL_GetError().</p>
+
+<p>Po skončení práce se zvukem je vždy nutné pomocí SDL_FreeWAV() uvolnit alokovaná data. </p>
+
+<pre>
+void SDL_FreeWAV(Uint8 *audio_buf);
+</pre>
+
+<p>Příklad nahrání zvuku ze souboru...</p>
+
+<pre>
+// Globální proměnné
+Uint8 *g_sound_data;	// Ukazatel na data
+Uint32 g_sound_len;	// Délka dat
+
+// Např. inicializace
+SDL_AudioSpec spec;	// Formát dat
+
+if(SDL_LoadWAV("test.wav", &spec, &g_sound_data,
+		&g_sound_len) == NULL)
+{
+	fprintf(stderr, "Unable to load test.wav: %s\n",
+			SDL_GetError());
+	return false;
+}
+
+// Úklid
+SDL_FreeWAV(g_sound_data);
+</pre>
+
+
+<h2>Mixování zvuků</h2>
+
+<p>SDL poskytuje funkci SDL_MixAudio(), která umí smixovat dva zvuky se stejným formátem. První dva parametry představují cílový a zdrojový buffer, len je délka v bytech a volume označuje hlasitost. Ta může nabývat hodnot od nuly do SDL_MIX_MAXVOLUME (definováno jako 128) a je vhodné ji nastavit na maximum.</p>
+
+<pre>
+void SDL_MixAudio(Uint8 *dst, Uint8 *src, Uint32 len, int volume);
+</pre>
+
+
+<h2>Plnění audio bufferu</h2>
+
+<p>Jak už bylo zmíněno na začátku, SDL je při práci se zvuky velmi nízkoúrovňové, a proto je programátor nucen napsat si i vlastní plnění audio bufferu. Ukazatel na tuto funkci se předává do SDL při otevírání audio zařízení a volání je v podstatě automatické.</p>
+
+<p>Kód převezmeme z ukázkového programu, který se dodává společně se SDL (adresář test). Jeho výsledkem bude zvuk přehrávaný v nekonečné smyčce.</p>
+
+<pre>
+Uint8	*g_sound_data;	// Ukazatel na data zvuku
+Uint32	g_sound_len;	// Délka dat
+int	g_sound_pos;	// Pozice při přehrávání
+
+void AudioCallback(void *userdata, Uint8 *stream, int len)
+{
+	// Ukazatel na část, kde se má začít přehrávat
+	Uint8 *wave_ptr = g_sound_data + g_sound_pos;
+
+	// Délka zvuku do konce
+	int wave_left = g_sound_len - g_sound_pos;
+
+	// Zbývající délka je menší než požadovaná
+	// Cyklus, protože celý zvuk muže být kratší
+	while(wave_left &lt;= len)
+	{
+		// Pošle data na zvukovou kartu
+		SDL_MixAudio(stream, wave_ptr, wave_left,
+				SDL_MIX_MAXVOLUME);
+
+		// Posune se o právě zapsaná data
+		stream += wave_left;
+		len -= wave_left;
+
+		// Od začátku zvuku
+		wave_ptr = g_sound_data;
+		wave_left = g_sound_len;
+		g_sound_pos = 0;
+	}
+
+	// Zbývající část zvuku je delší než požadovaná
+	SDL_MixAudio(stream, wave_ptr, len,
+			SDL_MIX_MAXVOLUME);
+	g_sound_pos += len;
+}
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>SDL a audio</h3>
+
+<p>Větší část dnešního programu se objevila už ve článku, jedná se tedy o aplikaci přehrávající v nekonečné smyčce zvuk nahraný z .wav souboru. Mezerníkem je možné zvukový výstup dočasně pozastavit a pomocí +/- se dá měnit hlasitost. <a href="./src/sdl_17_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_17_a.tar.gz">Příklad: SDL a audio</a></li>
+<li><a href="sdl_17.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>V příštím díle probereme funkce, které SDL poskytuje pro konverzi zvuků do požadovaného formátu, nahrávání zvuků pomocí knihovny SDL_sound i z jiných typů souborů než je .WAV, a pokud zbyde trochu místa, zkusíme nakousnout knihovnu SDL_mixer.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 16.06.2005</div>
+
+</body>
+</html>

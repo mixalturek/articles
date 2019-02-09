@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="iso-8859-2"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="cs" lang="CS">
+
+<head>
+<meta http-equiv="content-type" content="text/html; charset=iso-8859-2" />
+<meta http-equiv="content-language" content="cs" />
+<meta name="author" content="all: Michal Turek - Woq; WOQ (zavináč) seznam.cz" />
+<style type="text/css" media="all">@import "./data/style.css";</style>
+<title>SDL: Hry nejen pro Linux (11)</title>
+</head>
+
+<body>
+
+<h1>SDL: Hry nejen pro Linux (11)</h1>
+
+<p class="perex">Na konci minulého dílu jsme nakousli základní práci s událostmi, dnes budeme pokračovat. Tento článek je primárně věnován práci s frontou událostí, ale jelikož ještě nevíme nic o unionu SDL_Event, bude částečně probrán i on.</p>
+
+
+<p>Základem zpracování událostí je v SDL union SDL_Event a funkce, které načítají tyto objekty z fronty zpráv. Nejdříve bude v rychlosti probrána zmíněná datová struktura a pak se budeme celý zbytek článku věnovat práci s frontou událostí.</p>
+
+
+<h2>Union SDL_Event</h2>
+
+<p>Pro ty kteří už zapomněli... Datový typ union je podobný klasické struktuře, rozdíl mezi nimi spočívá v tom, že v určitém okamžiku může v jeho vnitřku existovat vždy jen jedna z deklarovaných položek. Při vytváření se alokuje paměť o velikosti největší z nich.</p>
+
+<p>Union SDL_Event je pravděpodobně, hned po SDL_Surface, druhý nejdůležitější a nejpoužívanější ze všech SDL datových typů. Jak už bylo několikrát zmíněno, poskytuje programátorovi rozhraní pro práci s událostmi.</p>
+
+<pre>
+typedef union
+{
+	Uint8 type;			// Typ události
+
+	SDL_ActiveEvent		active;	// (De)aktivace okna
+	SDL_KeyboardEvent	key;	// Klávesnice
+	SDL_MouseMotionEvent	motion;	// Myš
+	SDL_MouseButtonEvent	button;
+	SDL_JoyAxisEvent	jaxis;	// Joystick
+	SDL_JoyBallEvent	jball;
+	SDL_JoyHatEvent		jhat;
+	SDL_JoyButtonEvent	jbutton;
+	SDL_ResizeEvent		resize;	// Změna velikosti okna
+	SDL_ExposeEvent		expose;	// Požadavek na překreslení
+	SDL_QuitEvent		quit;	// Požadavek na ukončení
+	SDL_UserEvent		user;	// Uživatelská událost
+	SDL_SywWMEvent		syswm;	// Systémově závislá
+} SDL_Event;
+</pre>
+
+<p>Jak to všechno funguje? Když uživatel například změní velikost okna, SDL vygeneruje objekt SDL_Event, atribut type nastaví na hodnotu SDL_VIDEORESIZE a do jeho parametrů (podobjekt resize) uloží nové rozměry okna. Celý objekt je pak vložen do fronty událostí.</p>
+
+<p>Detekuje-li aplikace příchod zprávy, podle parametru type zjistí, že se jedná o změnu velikosti okna a v resize.w, resize.h najde nové rozměry. V závislosti na nich pak provede odpovídající akci - například překreslí scénu nebo aktualizuje OpenGL perspektivu.</p>
+
+<p>Proměnná type může nabývat hodnot uvedených v následující tabulce v levém sloupci. Vpravo se pak nachází odpovídající struktura, ve které se hledají podrobnosti o události.</p>
+
+<table>
+<tr align="left"><th>Typ události</th>	<th>Odpovídající struktura</th></tr>
+<tr><td>SDL_ACTIVEEVENT</td>		<td>SDL_ActiveEvent</td></tr>
+<tr><td>SDL_KEYDOWN/UP</td>		<td>SDL_KeyboardEvent</td></tr>
+<tr><td>SDL_MOUSEMOTION</td>		<td>SDL_MouseMotionEvent</td></tr>
+<tr><td>SDL_MOUSEBUTTONDOWN/UP</td>	<td>SDL_MouseButtonEvent</td></tr>
+<tr><td>SDL_JOYAXISMOTION</td>		<td>SDL_JoyAxisEvent</td></tr>
+<tr><td>SDL_JOYBALLMOTION</td>		<td>SDL_JoyBallEvent</td></tr>
+<tr><td>SDL_JOYHATMOTION</td>		<td>SDL_JoyHatEvent</td></tr>
+<tr><td>SDL_JOYBUTTONDOWN/UP</td>	<td>SDL_JoyButtonEvent</td></tr>
+<tr><td>SDL_QUIT</td>			<td>SDL_QuitEvent</td></tr>
+<tr><td>SDL_VIDEORESIZE</td>		<td>SDL_ResizeEvent</td></tr>
+<tr><td>SDL_VIDEOEXPOSE</td>		<td>SDL_ExposeEvent</td></tr>
+<tr><td>SDL_USEREVENT</td>		<td>SDL_UserEvent</td></tr>
+<tr><td>SDL_SYSWMEVENT</td>		<td>SDL_SysWMEvent</td></tr>
+</table>
+
+<p>Protože popis těchto struktur a všeho, co s nimi souvisí, zabere několik následujících článků, budeme se nejprve věnovat funkcím, které vyzvedávají události z fronty a pak až konkrétnímu popisu jednotlivých zpráv.</p>
+
+
+<h2>Načítání událostí z fronty</h2>
+
+<p>Existují dva základní způsoby, jak načíst událost z fronty, v SDL je reprezentují funkce SDL_PollEvent() a SDL_WaitEvent(). Obě vezmou událost, která je zrovna na řadě, zkopírují její data do předaného parametru a odstraní ji z fronty. Co se stane s událostí dál, záleží na programátorovi, který vytváří aplikaci.</p>
+
+<pre>
+int SDL_PollEvent(SDL_Event *event);
+int SDL_WaitEvent(SDL_Event *event);
+</pre>
+
+<p>Rozdíl mezi těmito funkcemi se projeví až tehdy, když je fronta prázdná. Jak už z názvu SDL_WaitEvent() vyplývá, tato funkce čeká libovolně dlouho, dokud nějaká zpráva nedorazí. Narozdíl od toho, SDL_PollEvent() se v případě prázdné fronty ihned ukončí a nulovým návratovým kódem oznámí, že nebylo načteno nic. V ostatních případech vrátí jedničku, která vyjadřuje, že byla nějaká zpráva načtena a má se zpracovat. SDL_WaitEvent() naproti tomu vrátí nulu, pouze pokud nastane nějaká chyba.</p>
+
+<p>Události se typicky zpracovávají v cyklu, který se ukončí, když je fronta prázdná.</p>
+
+<pre>
+SDL_Event event;
+while(SDL_PollEvent(&amp;event))
+{
+	// Zpracování události
+}
+
+// Všechny události zpracovány
+</pre>
+
+<p>Může vyvstat otázka, kterou z funkcí je lepší používat. Dá se říci, že v 99 procentech případů sáhne programátor po SDL_PollEvent() a SDL_WaitEvent() použije pouze ve výjimečných případech. Důvodem je, že program potřebuje neustále provádět určitou činnost, jako jsou animace a herní logika. Systémové časovače však nemusí být pro tento typ úloh zrovna nejlepší volbou, protože jsou většinou výrazně pomalejší než cyklus, který se provádí neustále dokola. U jednoduchých her je v podstatě jedno, co se použije, nicméně u trochu složitějších bývají s rychlostí velké problémy.</p>
+
+<p>Události se načítají ze vstupních zařízení funkcí SDL_PumpEvents(), bez ní by nikdy aplikaci nepřišla žádná zpráva. V SDL_PollEvent() a SDL_WaitEvent() je volána automaticky, při jiném způsobu načítání zpráv musí být použita explicitně.</p>
+
+<pre>
+void SDL_PumpEvents(void);
+</pre>
+
+<p>SDL dokumentace uvádí, že SDL_PumpEvents() nesmí být použito v jiném vláknu než, ve kterém bylo voláno SDL_SetVideoMode().</p>
+
+
+<h2>Vkládání událostí do fronty</h2>
+
+<p>Událostní systém v SDL není pouze jednosměrný, ale může být použit i k dialogu mezi různými částmi aplikace. Funkce SDL_PushEvent() přebírá ukazatel na objekt události, který umístí do fronty (resp. její kopii), a v případě úspěchu vrátí 0, jinak -1.</p>
+
+<pre>
+int SDL_PushEvent(SDL_Event *event);
+</pre>
+
+<p>Většinou se posílají uživatelské události (SDL_USEREVENT), ale jelikož ještě nebyly vysvětleny, ukážeme si poslání na SDL_QUIT. Tato událost zprostředkovává programu požadavek na ukončení a nepřebírá žádné parametry.</p>
+
+<pre>
+void PushQuitEvent()
+{
+	SDL_Event event;
+	event.type = SDL_QUIT;
+	SDL_PushEvent(&amp;event);
+}
+</pre>
+
+<p>Kdykoli by byla v programu zavolána tato funkce, aplikace by byla ukončena (předpokládá se standardní ukončení aplikace po příchodu SDL_QUIT).</p>
+
+
+<h2>Obecná práce s frontou</h2>
+
+<p>Všechny činnosti s frontou zpráv, které byly právě probrány, a také některé další, mohou být provedeny pomocí SDL_PeepEvents(). Tato obecná funkce přebírá v prvních dvou parametrech ukazatel na pole událostí a samozřejmě jeho velikost.</p>
+
+<pre>
+int SDL_PeepEvents(SDL_Event *events, int numevents,
+		SDL_eventaction action, Uint32 mask);
+</pre>
+
+<p>Parametr action specifikuje, co se má vykonat. Je-li nastaven na SDL_ADDEVENT, jsou události z pole vloženy do fronty, v případě SDL_PEEKEVENT budou vráceny, ale ne vymazány. K vrácení a následnému vymazání z fronty slouží SDL_GETEVENT.</p>
+
+<p>Poslední parametr definuje masku událostí, se kterými se má pracovat. Jedná se o ANDované flagy makra SDL_EVENTMASK(typ_události). Také se mohou použít přímé názvy masek, lze je najít v hlavičkovém souboru SDL_events.h. Maska pro libovolné události nese označení SDL_ALLEVENTS.</p>
+
+<p>Návratová hodnota představuje počet vložených/načtených událostí, v případě chyby je vráceno -1.</p>
+
+
+<h2>Zákaz generování některých událostí</h2>
+
+<p>Pomocí funkce SDL_EventState() lze specifikovat, jestli se mají události daného typu vkládat do fronty, nebo ne. První parametr specifikuje typ události a druhý určuje činnost funkce. Je-li předán flag SDL_IGNORE, události se do fronty vkládat nebudou, v případě SDL_ENABLE se zpracovávají normálně a SDL_QUERY slouží k dotazům. Vrácen je vždy stav po modifikaci.</p>
+
+<pre>
+Uint8 SDL_EventState(Uint8 type, int state);
+</pre>
+
+<p>Tato funkce se uplatní především při používání technik, které zjišťují stav vstupních zařízení přímo a bylo by tedy zbytečné generovat události. Například funkce SDL_GetKeyState() umožňuje programátorovi dotázat se na stisk klávesy. K tomu však až příště.</p>
+
+<p>Pomocí následujících dvou řádků lze zakázat generování všech událostí klávesnice.</p>
+
+<pre>
+SDL_EventState(SDL_KEYUP, SDL_IGNORE);
+SDL_EventState(SDL_KEYDOWN, SDL_IGNORE);
+</pre>
+
+
+<h2>Filtr událostí</h2>
+
+<p>O něco flexibilnější než předchozí funkce je SDL_SetEventFilter(), pomocí které lze do SDL předat ukazatel na rutinu, jenž může filtrovat události nejen podle typu, ale i podle ostatních parametrů.</p>
+
+<pre>
+void SDL_SetEventFilter(SDL_EventFilter filter);
+SDL_EventFilter SDL_GetEventFilter(void);
+</pre>
+
+<p>Typ SDL_EventFilter je definován jako ukazatel na funkci, které je v parametru předán ukazatel na událost. Vrátí-li tato funkce číslo jedna, bude událost vložena do fronty, v případě nuly nebude.</p>
+
+<pre>
+typedef int (*SDL_EventFilter)(const SDL_Event *event);
+</pre>
+
+<p>Jediná připomínka vzniká u události SDL_QUIT. Filtr je pro ni volán pouze tehdy, pokud správce oken vyžaduje zavřít okno aplikace. V takovém případě vrácená jednička říká, aby bylo okno zavřeno, cokoli jiného ponechá okno otevřené (je-li to možné). Pokud je vyvoláno SDL_QUIT kvůli signálu o přerušení, filtr volán nebude a zpráva je vždy doručena přímo aplikaci.</p>
+
+<p>A ještě dvě krátké poznámky: Filtr není volán na události, které vkládá do fronty sama aplikace (SDL_PushEvent(), SDL_PeepEvents()), a jelikož může být vykonáván v jiném vláknu, měli byste si dávat pozor, co v něm děláte.</p>
+
+<p>V následujícím příkladu má SDL zakázáno generovat události klávesnice, pokud se nejedná o klávesu abecedního znaku nebo čísla. Je to vlastně analogie příkladu u funkce SDL_EventState(), nicméně zde byl výběr navíc omezen podle parametrů. Všimněte si, že filtr má podobnou strukturu jako samotné zpracovávání událostí.</p>
+
+<pre>
+#include &lt;ctype.h&gt;// Kvůli isalnum()
+
+int EventFilter(const SDL_Event *event)
+{
+	switch(event->type)
+	{
+	case SDL_KEYDOWN:
+		// Abecední znak nebo číslo?
+		if(isalnum(event->key.keysym.sym))
+			return 1;// Vložit
+		else
+			return 0;// Nevkládat
+		break;
+
+	default:
+		break;
+	}
+
+	return 1;// Vložit
+}
+
+// Zapnutí filtru např. v Init()
+SDL_SetEventFilter(EventFilter);
+</pre>
+
+
+<h2>Ukázkové programy</h2>
+
+<h3>Fronta událostí</h3>
+
+<p>Program demonstruje nejčastější techniky používané při práci s frontou událostí. Jsou jimi načítání a vkládání zpráv z/do fronty a filtrování událostí. Pomocí mezerníku lze zapínat a vypínat filtrování zpráv o uvolnění kláves (při příchodu se vypíše oznámení do konzole), zprávy týkající se myši se vždy ignorují. Stejně jako u příkladu z minula, ani zde se nic nevykresluje. <a href="./src/sdl_11_a.html">(zdrojový kód se zvýrazněním syntaxe)</a></p>
+
+<div class="img"><img src="./data/11_prog_a.png" width="328" height="269" alt="Fronta událostí" /></div>
+
+
+<h2>Download</h2>
+
+<p><ul>
+<li><a href="./src/sdl_11_a.tar.gz">Příklad: Fronta událostí</a></li>
+<li><a href="sdl_11.tar.gz">Offline verze článku včetně všech příloh</a></li>
+</ul></p>
+
+
+<h2>Pokračování</h2>
+
+<p>Dnešním dílem jsme postavili spíše teoretické základy pro zpracování událostí. Příště budeme už konkrétnější, je věnován zpracování vstupů z klávesnice.</p>
+
+
+<div class="autor">Michal Turek - Woq &lt;WOQ (zavináč) seznam.cz&gt;, 10.04.2005</div>
+
+</body>
+</html>
